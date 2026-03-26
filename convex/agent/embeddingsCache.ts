@@ -3,6 +3,7 @@ import { ActionCtx, internalMutation, internalQuery } from '../_generated/server
 import { internal } from '../_generated/api';
 import { Id } from '../_generated/dataModel';
 import { fetchEmbeddingBatch } from '../util/llm';
+import { t } from '../../locales';
 
 const selfInternal = internal.agent.embeddingsCache;
 
@@ -29,7 +30,10 @@ export async function fetchBatch(ctx: ActionCtx, texts: string[]) {
     const response = await fetchEmbeddingBatch(missingTexts);
     if (response.embeddings.length !== missingIndexes.length) {
       throw new Error(
-        `Expected ${missingIndexes.length} embeddings, got ${response.embeddings.length}`,
+        t('backend.embeddingsCache.expectedEmbeddingsCount', {
+          expected: missingIndexes.length,
+          actual: response.embeddings.length,
+        }),
       );
     }
     for (let i = 0; i < missingIndexes.length; i++) {

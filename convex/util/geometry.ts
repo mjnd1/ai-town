@@ -1,4 +1,5 @@
 import { Path, PathComponent, Point, Vector, packPathComponent, queryPath } from './types';
+import { t } from '../../locales';
 
 export function distance(p0: Point, p1: Point): number {
   const dx = p0.x - p1.x;
@@ -16,7 +17,7 @@ export function manhattanDistance(p0: Point, p1: Point) {
 
 export function pathOverlaps(path: Path, time: number): boolean {
   if (path.length < 2) {
-    throw new Error(`Invalid path: ${JSON.stringify(path)}`);
+    throw new Error(t('backend.geometry.invalidPath', { path: JSON.stringify(path) }));
   }
   const start = queryPath(path, 0);
   const end = queryPath(path, path.length - 1);
@@ -28,7 +29,7 @@ export function pathPosition(
   time: number,
 ): { position: Point; facing: Vector; velocity: number } {
   if (path.length < 2) {
-    throw new Error(`Invalid path: ${JSON.stringify(path)}`);
+    throw new Error(t('backend.geometry.invalidPath', { path: JSON.stringify(path) }));
   }
   const first = queryPath(path, 0);
   if (time < first.t) {
@@ -54,7 +55,7 @@ export function pathPosition(
       };
     }
   }
-  throw new Error(`Timestamp checks not exhaustive?`);
+  throw new Error(t('backend.geometry.timestampCheckIncomplete'));
 }
 
 export const EPSILON = 0.0001;
@@ -83,7 +84,9 @@ export function normalize(vector: Vector): Vector | null {
 
 export function orientationDegrees(vector: Vector): number {
   if (Math.sqrt(vector.dx * vector.dx + vector.dy * vector.dy) < EPSILON) {
-    throw new Error(`Can't compute the orientation of too small vector ${JSON.stringify(vector)}`);
+    throw new Error(
+      t('backend.geometry.tooSmallVector', { vector: JSON.stringify(vector) }),
+    );
   }
   const twoPi = 2 * Math.PI;
   const radians = (Math.atan2(vector.dy, vector.dx) + twoPi) % twoPi;

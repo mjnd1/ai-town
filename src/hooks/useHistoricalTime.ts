@@ -1,5 +1,6 @@
 import { Doc } from '../../convex/_generated/dataModel';
 import { useEffect, useRef, useState } from 'react';
+import { t } from '../../locales';
 
 export function useHistoricalTime(engineStatus?: Doc<'engines'>) {
   const timeManager = useRef(new HistoricalTimeManager());
@@ -45,7 +46,7 @@ export class HistoricalTimeManager {
         return;
       }
       if (latest.endTs > engineStatus.currentTime) {
-        throw new Error(`Received out-of-order engine status`);
+        throw new Error(t('frontend.errors.outOfOrderEngineStatus'));
       }
     }
     const newInterval = {

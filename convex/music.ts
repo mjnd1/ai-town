@@ -3,6 +3,7 @@ import { query, internalMutation } from './_generated/server';
 import Replicate, { WebhookEventType } from 'replicate';
 import { httpAction, internalAction } from './_generated/server';
 import { internal, api } from './_generated/api';
+import { t } from '../locales';
 
 function client(): Replicate {
   const replicate = new Replicate({
@@ -37,7 +38,7 @@ export const getBackgroundMusic = query({
     }
     const url = await ctx.storage.getUrl(music.storageId);
     if (!url) {
-      throw new Error(`Invalid storage ID: ${music.storageId}`);
+      throw new Error(t('backend.music.invalidStorageId', { id: music.storageId }));
     }
     return url;
   },
@@ -50,11 +51,11 @@ export const enqueueBackgroundMusicGeneration = internalAction({
     }
     const worldStatus = await ctx.runQuery(api.world.defaultWorldStatus);
     if (!worldStatus) {
-      console.log('No active default world, returning.');
+      console.log(t('backend.music.noActiveDefaultWorld'));
       return;
     }
     // TODO: MusicGen-Large on Replicate only allows 30 seconds. Use MusicGen-Small for longer?
-    await generateMusic('16-bit RPG adventure game with wholesome vibe', 30);
+    await generateMusic(t('backend.music.backgroundPrompt'), 30);
   },
 });
 
@@ -112,7 +113,7 @@ export async function generateMusic(
   model_version = 'large',
 ) {
   if (!replicateAvailable()) {
-    throw new Error('Replicate API token not set');
+    throw new Error(t('backend.music.replicateTokenNotSet'));
   }
   return await client().predictions.create({
     // https://replicate.com/facebookresearch/musicgen/versions/7a76a8258b23fae65c5a22debb8841d1d7e816b75c2f24218cd2bd8573787906

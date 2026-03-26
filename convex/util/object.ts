@@ -1,3 +1,5 @@
+import { t } from '../../locales';
+
 export function parseMap<Id, Serialized, Parsed>(
   records: Serialized[],
   constructor: new (r: Serialized) => Parsed,
@@ -8,7 +10,7 @@ export function parseMap<Id, Serialized, Parsed>(
     const parsed = new constructor(record);
     const id = getId(parsed);
     if (out.has(id)) {
-      throw new Error(`Duplicate ID ${id}`);
+      throw new Error(t('backend.utils.duplicateId', { id: String(id) }));
     }
     out.set(id, parsed);
   }

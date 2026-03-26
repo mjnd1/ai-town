@@ -11,6 +11,7 @@ import { Game } from './game';
 import { stopPlayer, blocked, movePlayer } from './movement';
 import { ConversationMembership, serializedConversationMembership } from './conversationMembership';
 import { parseMap, serializeMap } from '../util/object';
+import { t } from '../../locales';
 
 export class Conversation {
   id: GameId<'conversations'>;
@@ -51,7 +52,12 @@ export class Conversation {
       delete this.isTyping;
     }
     if (this.participants.size !== 2) {
-      console.warn(`Conversation ${this.id} has ${this.participants.size} participants`);
+      console.warn(
+        t('backend.conversation.participantCount', {
+          id: this.id,
+          count: this.participants.size,
+        }),
+      );
       return;
     }
     const [playerId1, playerId2] = [...this.participants.keys()];
@@ -67,7 +73,12 @@ export class Conversation {
     // of them to "participating" and stop their paths.
     if (member1.status.kind === 'walkingOver' && member2.status.kind === 'walkingOver') {
       if (playerDistance < CONVERSATION_DISTANCE) {
-        console.log(`Starting conversation between ${player1.id} and ${player2.id}`);
+        console.log(
+          t('backend.conversation.startingConversationBetween', {
+            player1: player1.id,
+            player2: player2.id,
+          }),
+        );
 
         // First, stop the two players from moving.
         stopPlayer(player1);
@@ -121,21 +132,21 @@ export class Conversation {
 
   static start(game: Game, now: number, player: Player, invitee: Player) {
     if (player.id === invitee.id) {
-      throw new Error(`Can't invite yourself to a conversation`);
+      throw new Error(t('backend.conversation.cantInviteSelf'));
     }
     // Ensure the players still exist.
     if ([...game.world.conversations.values()].find((c) => c.participants.has(player.id))) {
-      const reason = `Player ${player.id} is already in a conversation`;
+      const reason = t('backend.conversation.playerAlreadyInConversation', { id: player.id });
       console.log(reason);
       return { error: reason };
     }
     if ([...game.world.conversations.values()].find((c) => c.participants.has(invitee.id))) {
-      const reason = `Player ${player.id} is already in a conversation`;
+      const reason = t('backend.conversation.playerAlreadyInConversation', { id: invitee.id });
       console.log(reason);
       return { error: reason };
     }
     const conversationId = game.allocId('conversations');
-    console.log(`Creating conversation ${conversationId}`);
+    console.log(t('backend.conversation.creatingConversation', { id: conversationId }));
     game.world.conversations.set(
       conversationId,
       new Conversation({
@@ -155,7 +166,12 @@ export class Conversation {
   setIsTyping(now: number, player: Player, messageUuid: string) {
     if (this.isTyping) {
       if (this.isTyping.playerId !== player.id) {
-        throw new Error(`Player ${this.isTyping.playerId} is already typing in ${this.id}`);
+        throw new Error(
+          t('backend.conversation.playerAlreadyTyping', {
+            playerId: this.isTyping.playerId,
+            conversationId: this.id,
+          }),
+        );
       }
       return;
     }
@@ -165,11 +181,20 @@ export class Conversation {
   acceptInvite(game: Game, player: Player) {
     const member = this.participants.get(player.id);
     if (!member) {
-      throw new Error(`Player ${player.id} not in conversation ${this.id}`);
+      throw new Error(
+        t('backend.conversation.playerNotInConversation', {
+          playerId: player.id,
+          conversationId: this.id,
+        }),
+      );
     }
     if (member.status.kind !== 'invited') {
       throw new Error(
-        `Invalid membership status for ${player.id}:${this.id}: ${JSON.stringify(member)}`,
+        t('backend.conversation.invalidMembershipStatus', {
+          playerId: player.id,
+          conversationId: this.id,
+          member: JSON.stringify(member),
+        }),
       );
     }
     member.status = { kind: 'walkingOver' };
@@ -178,13 +203,20 @@ export class Conversation {
   rejectInvite(game: Game, now: number, player: Player) {
     const member = this.participants.get(player.id);
     if (!member) {
-      throw new Error(`Player ${player.id} not in conversation ${this.id}`);
+      throw new Error(
+        t('backend.conversation.playerNotInConversation', {
+          playerId: player.id,
+          conversationId: this.id,
+        }),
+      );
     }
     if (member.status.kind !== 'invited') {
       throw new Error(
-        `Rejecting invite in wrong membership state: ${this.id}:${player.id}: ${JSON.stringify(
-          member,
-        )}`,
+        t('backend.conversation.rejectWrongState', {
+          conversationId: this.id,
+          playerId: player.id,
+          member: JSON.stringify(member),
+        }),
       );
     }
     this.stop(game, now);
@@ -205,7 +237,12 @@ export class Conversation {
   leave(game: Game, now: number, player: Player) {
     const member = this.participants.get(player.id);
     if (!member) {
-      throw new Error(`Couldn't find membership for ${this.id}:${player.id}`);
+      throw new Error(
+        t('backend.conversation.membershipNotFound', {
+          conversationId: this.id,
+          playerId: player.id,
+        }),
+      );
     }
     this.stop(game, now);
   }
@@ -259,14 +296,14 @@ export const conversationInputs = {
       const playerId = parseGameId('players', args.playerId);
       const player = game.world.players.get(playerId);
       if (!player) {
-        throw new Error(`Invalid player ID: ${playerId}`);
+        throw new Error(t('backend.conversation.invalidPlayerId', { id: playerId }));
       }
       const inviteeId = parseGameId('players', args.invitee);
       const invitee = game.world.players.get(inviteeId);
       if (!invitee) {
-        throw new Error(`Invalid player ID: ${inviteeId}`);
+        throw new Error(t('backend.conversation.invalidPlayerId', { id: inviteeId }));
       }
-      console.log(`Starting ${playerId} ${inviteeId}...`);
+      console.log(t('backend.conversation.startingInput', { playerId, inviteeId }));
       const { conversationId, error } = Conversation.start(game, now, player, invitee);
       if (!conversationId) {
         // TODO: pass it back to the client for them to show an error.
@@ -286,16 +323,19 @@ export const conversationInputs = {
       const playerId = parseGameId('players', args.playerId);
       const player = game.world.players.get(playerId);
       if (!player) {
-        throw new Error(`Invalid player ID: ${playerId}`);
+        throw new Error(t('backend.conversation.invalidPlayerId', { id: playerId }));
       }
       const conversationId = parseGameId('conversations', args.conversationId);
       const conversation = game.world.conversations.get(conversationId);
       if (!conversation) {
-        throw new Error(`Invalid conversation ID: ${conversationId}`);
+        throw new Error(t('backend.conversation.invalidConversationId', { id: conversationId }));
       }
       if (conversation.isTyping && conversation.isTyping.playerId !== playerId) {
         throw new Error(
-          `Player ${conversation.isTyping.playerId} is already typing in ${conversationId}`,
+          t('backend.conversation.playerAlreadyTyping', {
+            playerId: conversation.isTyping.playerId,
+            conversationId,
+          }),
         );
       }
       conversation.isTyping = { playerId, messageUuid: args.messageUuid, since: now };
@@ -314,7 +354,7 @@ export const conversationInputs = {
       const conversationId = parseGameId('conversations', args.conversationId);
       const conversation = game.world.conversations.get(conversationId);
       if (!conversation) {
-        throw new Error(`Invalid conversation ID: ${conversationId}`);
+        throw new Error(t('backend.conversation.invalidConversationId', { id: conversationId }));
       }
       if (conversation.isTyping && conversation.isTyping.playerId === playerId) {
         delete conversation.isTyping;
@@ -337,12 +377,12 @@ export const conversationInputs = {
       const playerId = parseGameId('players', args.playerId);
       const player = game.world.players.get(playerId);
       if (!player) {
-        throw new Error(`Invalid player ID ${playerId}`);
+        throw new Error(t('backend.conversation.invalidPlayerId', { id: playerId }));
       }
       const conversationId = parseGameId('conversations', args.conversationId);
       const conversation = game.world.conversations.get(conversationId);
       if (!conversation) {
-        throw new Error(`Invalid conversation ID ${conversationId}`);
+        throw new Error(t('backend.conversation.invalidConversationId', { id: conversationId }));
       }
       conversation.acceptInvite(game, player);
       return null;
@@ -360,12 +400,12 @@ export const conversationInputs = {
       const playerId = parseGameId('players', args.playerId);
       const player = game.world.players.get(playerId);
       if (!player) {
-        throw new Error(`Invalid player ID ${playerId}`);
+        throw new Error(t('backend.conversation.invalidPlayerId', { id: playerId }));
       }
       const conversationId = parseGameId('conversations', args.conversationId);
       const conversation = game.world.conversations.get(conversationId);
       if (!conversation) {
-        throw new Error(`Invalid conversation ID ${conversationId}`);
+        throw new Error(t('backend.conversation.invalidConversationId', { id: conversationId }));
       }
       conversation.rejectInvite(game, now, player);
       return null;
@@ -381,12 +421,12 @@ export const conversationInputs = {
       const playerId = parseGameId('players', args.playerId);
       const player = game.world.players.get(playerId);
       if (!player) {
-        throw new Error(`Invalid player ID ${playerId}`);
+        throw new Error(t('backend.conversation.invalidPlayerId', { id: playerId }));
       }
       const conversationId = parseGameId('conversations', args.conversationId);
       const conversation = game.world.conversations.get(conversationId);
       if (!conversation) {
-        throw new Error(`Invalid conversation ID ${conversationId}`);
+        throw new Error(t('backend.conversation.invalidConversationId', { id: conversationId }));
       }
       conversation.leave(game, now, player);
       return null;

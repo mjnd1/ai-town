@@ -7,6 +7,7 @@ import { api, internal } from '../_generated/api';
 import * as embeddingsCache from './embeddingsCache';
 import { GameId, conversationId, playerId } from '../aiTown/ids';
 import { NUM_MEMORIES_TO_SEARCH } from '../constants';
+import { t } from '../../locales';
 
 const selfInternal = internal.agent.conversation;
 
@@ -28,7 +29,10 @@ export async function startConversationMessage(
   );
   const embedding = await embeddingsCache.fetch(
     ctx,
-    `${player.name} is talking to ${otherPlayer.name}`,
+    t('backend.agentConversation.talkingTo', {
+      player: player.name,
+      other: otherPlayer.name,
+    }),
   );
 
   const memories = await memory.searchMemories(
@@ -42,17 +46,18 @@ export async function startConversationMessage(
     (m) => m.data.type === 'conversation' && m.data.playerIds.includes(otherPlayerId),
   );
   const prompt = [
-    `You are ${player.name}, and you just started a conversation with ${otherPlayer.name}.`,
+    t('backend.agentConversation.startConversation', {
+      player: player.name,
+      other: otherPlayer.name,
+    }),
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
   prompt.push(...previousConversationPrompt(otherPlayer, lastConversation));
   prompt.push(...relatedMemoriesPrompt(memories));
   if (memoryWithOtherPlayer) {
-    prompt.push(
-      `Be sure to include some detail or question about a previous conversation in your greeting.`,
-    );
+    prompt.push(t('backend.agentConversation.includePreviousConversation'));
   }
-  const lastPrompt = `${player.name} to ${otherPlayer.name}:`;
+  const lastPrompt = speakerToRecipient(player.name, otherPlayer.name);
   prompt.push(lastPrompt);
 
   const { content } = await chatCompletion({
@@ -95,18 +100,24 @@ export async function continueConversationMessage(
   const started = new Date(conversation.created);
   const embedding = await embeddingsCache.fetch(
     ctx,
-    `What do you think about ${otherPlayer.name}?`,
+    t('backend.agentConversation.thinkingAbout', { other: otherPlayer.name }),
   );
   const memories = await memory.searchMemories(ctx, player.id as GameId<'players'>, embedding, 3);
   const prompt = [
-    `You are ${player.name}, and you're currently in a conversation with ${otherPlayer.name}.`,
-    `The conversation started at ${started.toLocaleString()}. It's now ${now.toLocaleString()}.`,
+    t('backend.agentConversation.continueConversation', {
+      player: player.name,
+      other: otherPlayer.name,
+    }),
+    t('backend.agentConversation.conversationTimeline', {
+      started: started.toLocaleString(),
+      now: new Date(now).toLocaleString(),
+    }),
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
   prompt.push(...relatedMemoriesPrompt(memories));
   prompt.push(
-    `Below is the current chat history between you and ${otherPlayer.name}.`,
-    `DO NOT greet them again. Do NOT use the word "Hey" too often. Your response should be brief and within 200 characters.`,
+    t('backend.agentConversation.currentChatHistory', { other: otherPlayer.name }),
+    t('backend.agentConversation.continueGuard'),
   );
 
   const llmMessages: LLMMessage[] = [
@@ -122,7 +133,7 @@ export async function continueConversationMessage(
       conversation.id as GameId<'conversations'>,
     )),
   ];
-  const lastPrompt = `${player.name} to ${otherPlayer.name}:`;
+  const lastPrompt = speakerToRecipient(player.name, otherPlayer.name);
   llmMessages.push({ role: 'user', content: lastPrompt });
 
   const { content } = await chatCompletion({
@@ -150,13 +161,16 @@ export async function leaveConversationMessage(
     },
   );
   const prompt = [
-    `You are ${player.name}, and you're currently in a conversation with ${otherPlayer.name}.`,
-    `You've decided to leave the question and would like to politely tell them you're leaving the conversation.`,
+    t('backend.agentConversation.leaveConversation', {
+      player: player.name,
+      other: otherPlayer.name,
+    }),
+    t('backend.agentConversation.leaveConversationReason'),
   ];
   prompt.push(...agentPrompts(otherPlayer, agent, otherAgent ?? null));
   prompt.push(
-    `Below is the current chat history between you and ${otherPlayer.name}.`,
-    `How would you like to tell them that you're leaving? Your response should be brief and within 200 characters.`,
+    t('backend.agentConversation.currentChatHistory', { other: otherPlayer.name }),
+    t('backend.agentConversation.leaveConversationGuard'),
   );
   const llmMessages: LLMMessage[] = [
     {
@@ -171,7 +185,7 @@ export async function leaveConversationMessage(
       conversation.id as GameId<'conversations'>,
     )),
   ];
-  const lastPrompt = `${player.name} to ${otherPlayer.name}:`;
+  const lastPrompt = speakerToRecipient(player.name, otherPlayer.name);
   llmMessages.push({ role: 'user', content: lastPrompt });
 
   const { content } = await chatCompletion({
@@ -189,11 +203,16 @@ function agentPrompts(
 ): string[] {
   const prompt = [];
   if (agent) {
-    prompt.push(`About you: ${agent.identity}`);
-    prompt.push(`Your goals for the conversation: ${agent.plan}`);
+    prompt.push(t('backend.agentConversation.aboutYou', { identity: agent.identity }));
+    prompt.push(t('backend.agentConversation.yourGoal', { plan: agent.plan }));
   }
   if (otherAgent) {
-    prompt.push(`About ${otherPlayer.name}: ${otherAgent.identity}`);
+    prompt.push(
+      t('backend.agentConversation.aboutOther', {
+        name: otherPlayer.name,
+        identity: otherAgent.identity,
+      }),
+    );
   }
   return prompt;
 }
@@ -207,9 +226,11 @@ function previousConversationPrompt(
     const prev = new Date(conversation.created);
     const now = new Date();
     prompt.push(
-      `Last time you chatted with ${
-        otherPlayer.name
-      } it was ${prev.toLocaleString()}. It's now ${now.toLocaleString()}.`,
+      t('backend.agentConversation.previousConversation', {
+        other: otherPlayer.name,
+        previous: prev.toLocaleString(),
+        now: now.toLocaleString(),
+      }),
     );
   }
   return prompt;
@@ -218,7 +239,7 @@ function previousConversationPrompt(
 function relatedMemoriesPrompt(memories: memory.Memory[]): string[] {
   const prompt = [];
   if (memories.length > 0) {
-    prompt.push(`Here are some related memories in decreasing relevance order:`);
+    prompt.push(t('backend.agentConversation.relatedMemoriesHeader'));
     for (const memory of memories) {
       prompt.push(' - ' + memory.description);
     }
@@ -240,7 +261,11 @@ async function previousMessages(
     const recipient = message.author === player.id ? otherPlayer : player;
     llmMessages.push({
       role: 'user',
-      content: `${author.name} to ${recipient.name}: ${message.text}`,
+      content: t('backend.memory.statementPrompt', {
+        author: author.name,
+        recipient: recipient.name,
+        text: message.text,
+      }),
     });
   }
   return llmMessages;
@@ -256,44 +281,52 @@ export const queryPromptData = internalQuery({
   handler: async (ctx, args) => {
     const world = await ctx.db.get(args.worldId);
     if (!world) {
-      throw new Error(`World ${args.worldId} not found`);
+      throw new Error(t('backend.agentConversation.worldNotFound', { id: args.worldId }));
     }
     const player = world.players.find((p) => p.id === args.playerId);
     if (!player) {
-      throw new Error(`Player ${args.playerId} not found`);
+      throw new Error(t('backend.agentConversation.playerNotFound', { id: args.playerId }));
     }
     const playerDescription = await ctx.db
       .query('playerDescriptions')
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', args.playerId))
       .first();
     if (!playerDescription) {
-      throw new Error(`Player description for ${args.playerId} not found`);
+      throw new Error(
+        t('backend.agentConversation.playerDescriptionNotFound', { id: args.playerId }),
+      );
     }
     const otherPlayer = world.players.find((p) => p.id === args.otherPlayerId);
     if (!otherPlayer) {
-      throw new Error(`Player ${args.otherPlayerId} not found`);
+      throw new Error(t('backend.agentConversation.playerNotFound', { id: args.otherPlayerId }));
     }
     const otherPlayerDescription = await ctx.db
       .query('playerDescriptions')
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', args.otherPlayerId))
       .first();
     if (!otherPlayerDescription) {
-      throw new Error(`Player description for ${args.otherPlayerId} not found`);
+      throw new Error(
+        t('backend.agentConversation.playerDescriptionNotFound', { id: args.otherPlayerId }),
+      );
     }
     const conversation = world.conversations.find((c) => c.id === args.conversationId);
     if (!conversation) {
-      throw new Error(`Conversation ${args.conversationId} not found`);
+      throw new Error(
+        t('backend.agentConversation.conversationNotFound', { id: args.conversationId }),
+      );
     }
     const agent = world.agents.find((a) => a.playerId === args.playerId);
     if (!agent) {
-      throw new Error(`Player ${args.playerId} not found`);
+      throw new Error(t('backend.agentConversation.playerNotFound', { id: args.playerId }));
     }
     const agentDescription = await ctx.db
       .query('agentDescriptions')
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('agentId', agent.id))
       .first();
     if (!agentDescription) {
-      throw new Error(`Agent description for ${agent.id} not found`);
+      throw new Error(
+        t('backend.agentConversation.agentDescriptionNotFound', { id: agent.id }),
+      );
     }
     const otherAgent = world.agents.find((a) => a.playerId === args.otherPlayerId);
     let otherAgentDescription;
@@ -303,7 +336,9 @@ export const queryPromptData = internalQuery({
         .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('agentId', otherAgent.id))
         .first();
       if (!otherAgentDescription) {
-        throw new Error(`Agent description for ${otherAgent.id} not found`);
+        throw new Error(
+          t('backend.agentConversation.agentDescriptionNotFound', { id: otherAgent.id }),
+        );
       }
     }
     const lastTogether = await ctx.db
@@ -327,7 +362,11 @@ export const queryPromptData = internalQuery({
         )
         .first();
       if (!lastConversation) {
-        throw new Error(`Conversation ${lastTogether.conversationId} not found`);
+        throw new Error(
+          t('backend.agentConversation.conversationNotFound', {
+            id: lastTogether.conversationId,
+          }),
+        );
       }
     }
     return {
@@ -345,8 +384,12 @@ export const queryPromptData = internalQuery({
   },
 });
 
+function speakerToRecipient(author: string, recipient: string) {
+  return t('backend.agentConversation.speakerToRecipient', { author, recipient });
+}
+
 function stopWords(otherPlayer: string, player: string) {
   // These are the words we ask the LLM to stop on. OpenAI only supports 4.
-  const variants = [`${otherPlayer} to ${player}`];
+  const variants = [speakerToRecipient(otherPlayer, player).replace(/：$/, '').replace(/:$/, '')];
   return variants.flatMap((stop) => [stop + ':', stop.toLowerCase() + ':']);
 }

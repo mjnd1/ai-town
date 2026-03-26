@@ -3,6 +3,7 @@ import { Doc, Id } from '../_generated/dataModel';
 import { ActionCtx, DatabaseReader, MutationCtx, internalQuery } from '../_generated/server';
 import { engine } from '../engine/schema';
 import { internal } from '../_generated/api';
+import { t } from '../../locales';
 
 export abstract class AbstractGame {
   abstract tickDuration: number;
@@ -58,7 +59,9 @@ export abstract class AbstractGame {
           const value = this.handleInput(currentTs, input.name, input.args);
           returnValue = { kind: 'ok' as const, value };
         } catch (e: any) {
-          console.error(`Input ${input._id} failed: ${e.message}`);
+          console.error(
+            t('backend.engine.inputFailed', { id: input._id, message: e.message }),
+          );
           returnValue = { kind: 'error' as const, message: e.message };
         }
         completedInputs.push({ inputId: input._id, returnValue });
@@ -84,7 +87,13 @@ export abstract class AbstractGame {
     const engineUpdate = { engine, completedInputs, expectedGenerationNumber };
     await this.saveStep(ctx, engineUpdate);
 
-    console.debug(`Simulated from ${startTs} to ${currentTs} (${currentTs - startTs}ms)`);
+    console.debug(
+      t('backend.engine.simulatedFromTo', {
+        start: startTs,
+        end: currentTs,
+        duration: currentTs - startTs,
+      }),
+    );
   }
 }
 
@@ -116,7 +125,7 @@ export async function loadEngine(
 ) {
   const engine = await db.get(engineId);
   if (!engine) {
-    throw new Error(`No engine found with id ${engineId}`);
+    throw new Error(t('backend.engine.noEngineFound', { id: engineId }));
   }
   if (!engine.running) {
     throw new ConvexError({
@@ -125,7 +134,10 @@ export async function loadEngine(
     });
   }
   if (engine.generationNumber !== generationNumber) {
-    throw new ConvexError({ kind: 'generationNumber', message: 'Generation number mismatch' });
+    throw new ConvexError({
+      kind: 'generationNumber',
+      message: t('backend.engine.generationMismatch'),
+    });
   }
   return engine;
 }
@@ -181,17 +193,19 @@ export async function applyEngineUpdate(
     update.engine.currentTime &&
     update.engine.currentTime < engine.currentTime
   ) {
-    throw new Error('Time moving backwards');
+    throw new Error(t('backend.engine.timeMovingBackwards'));
   }
   await ctx.db.replace(engine._id, update.engine);
 
   for (const completedInput of update.completedInputs) {
     const input = await ctx.db.get(completedInput.inputId);
     if (!input) {
-      throw new Error(`Input ${completedInput.inputId} not found`);
+      throw new Error(t('backend.engine.inputNotFound', { id: completedInput.inputId }));
     }
     if (input.returnValue) {
-      throw new Error(`Input ${completedInput.inputId} already completed`);
+      throw new Error(
+        t('backend.engine.inputAlreadyCompleted', { id: completedInput.inputId }),
+      );
     }
     input.returnValue = completedInput.returnValue;
     await ctx.db.replace(input._id, input);

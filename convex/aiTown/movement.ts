@@ -7,6 +7,7 @@ import { Game } from './game';
 import { GameId } from './ids';
 import { Player } from './player';
 import { WorldMap } from './worldMap';
+import { t } from '../../locales';
 
 type PathCandidate = {
   position: Point;
@@ -30,7 +31,11 @@ export function movePlayer(
   allowInConversation?: boolean,
 ) {
   if (Math.floor(destination.x) !== destination.x || Math.floor(destination.y) !== destination.y) {
-    throw new Error(`Non-integral destination: ${JSON.stringify(destination)}`);
+    throw new Error(
+      t('backend.movement.nonIntegralDestination', {
+        destination: JSON.stringify(destination),
+      }),
+    );
   }
   const { position } = player;
   // Close enough to current position or destination => no-op.
@@ -42,7 +47,7 @@ export function movePlayer(
     (c) => c.participants.get(player.id)?.status.kind === 'participating',
   );
   if (inConversation && !allowInConversation) {
-    throw new Error(`Can't move when in a conversation. Leave the conversation first!`);
+    throw new Error(t('backend.movement.moveWhileInConversation'));
   }
   player.pathfinding = {
     destination: destination,
@@ -170,7 +175,7 @@ export function blocked(game: Game, now: number, pos: Point, playerId?: GameId<'
 
 export function blockedWithPositions(position: Point, otherPositions: Point[], map: WorldMap) {
   if (isNaN(position.x) || isNaN(position.y)) {
-    throw new Error(`NaN position in ${JSON.stringify(position)}`);
+    throw new Error(t('backend.movement.nanPosition', { position: JSON.stringify(position) }));
   }
   if (position.x < 0 || position.y < 0 || position.x >= map.width || position.y >= map.height) {
     return 'out of bounds';

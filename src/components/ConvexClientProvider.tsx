@@ -2,6 +2,7 @@ import { ReactNode } from 'react';
 import { ConvexReactClient, ConvexProvider } from 'convex/react';
 // import { ConvexProviderWithClerk } from 'convex/react-clerk';
 // import { ClerkProvider, useAuth } from '@clerk/clerk-react';
+import { t } from '../../locales';
 
 /**
  * Determines the Convex deployment to use.
@@ -12,7 +13,7 @@ import { ConvexReactClient, ConvexProvider } from 'convex/react';
 function convexUrl(): string {
   const url = import.meta.env.VITE_CONVEX_URL as string;
   if (!url) {
-    throw new Error('Couldn’t find the Convex deployment URL.');
+    throw new Error(t('frontend.errors.convexDeploymentUrlMissing'));
   }
   return url;
 }

@@ -25,6 +25,7 @@ import { internal } from '../_generated/api';
 import { HistoricalObject } from '../engine/historicalObject';
 import { AgentDescription, serializedAgentDescription } from './agentDescription';
 import { parseMap, serializeMap } from '../util/object';
+import { t } from '../../locales';
 
 const gameState = v.object({
   world: v.object(serializedWorld),
@@ -93,14 +94,14 @@ export class Game extends AbstractGame {
   ): Promise<{ engine: Doc<'engines'>; gameState: GameState }> {
     const worldDoc = await db.get(worldId);
     if (!worldDoc) {
-      throw new Error(`No world found with id ${worldId}`);
+      throw new Error(t('backend.game.noWorldFound', { id: worldId }));
     }
     const worldStatus = await db
       .query('worldStatus')
       .withIndex('worldId', (q) => q.eq('worldId', worldId))
       .unique();
     if (!worldStatus) {
-      throw new Error(`No engine found for world ${worldId}`);
+      throw new Error(t('backend.main.noEngineForWorld', { id: worldId }));
     }
     const engine = await loadEngine(db, worldStatus.engineId, generationNumber);
     const playerDescriptionsDocs = await db
@@ -116,7 +117,7 @@ export class Game extends AbstractGame {
       .withIndex('worldId', (q) => q.eq('worldId', worldId))
       .unique();
     if (!worldMapDoc) {
-      throw new Error(`No map found for world ${worldId}`);
+      throw new Error(t('backend.world.noMapForWorld', { id: worldId }));
     }
     // Discard the system fields and historicalLocations from the world state.
     const { _id, _creationTime, historicalLocations: _, ...world } = worldDoc;
@@ -157,7 +158,7 @@ export class Game extends AbstractGame {
   handleInput<Name extends InputNames>(now: number, name: Name, args: InputArgs<Name>) {
     const handler = inputs[name]?.handler;
     if (!handler) {
-      throw new Error(`Invalid input: ${name}`);
+      throw new Error(t('backend.game.invalidInput', { name }));
     }
     return handler(this, now, args as any);
   }
@@ -226,9 +227,10 @@ export class Game extends AbstractGame {
     }
     if (bufferSize > 0) {
       console.debug(
-        `Packed ${Object.entries(historicalLocations).length} history buffers in ${(
-          bufferSize / 1024
-        ).toFixed(2)}KiB.`,
+        t('backend.game.packedHistoryBuffers', {
+          count: Object.entries(historicalLocations).length,
+          size: (bufferSize / 1024).toFixed(2),
+        }),
       );
     }
     this.historicalLocations.clear();
@@ -250,7 +252,7 @@ export class Game extends AbstractGame {
   static async saveDiff(ctx: MutationCtx, worldId: Id<'worlds'>, diff: GameStateDiff) {
     const existingWorld = await ctx.db.get(worldId);
     if (!existingWorld) {
-      throw new Error(`No world found with id ${worldId}`);
+      throw new Error(t('backend.game.noWorldFound', { id: worldId }));
     }
     const newWorld = diff.world;
     // Archive newly deleted players, conversations, and agents.

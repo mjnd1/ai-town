@@ -10,6 +10,7 @@ import { useHistoricalValue } from '../hooks/useHistoricalValue.ts';
 import { PlayerDescription } from '../../convex/aiTown/playerDescription.ts';
 import { WorldMap } from '../../convex/aiTown/worldMap.ts';
 import { ServerGame } from '../hooks/serverGame.ts';
+import { t } from '../../locales';
 
 export type SelectElement = (element?: { kind: 'player'; id: GameId<'players'> }) => void;
 
@@ -31,7 +32,7 @@ export const Player = ({
 }) => {
   const playerCharacter = game.playerDescriptions.get(player.id)?.character;
   if (!playerCharacter) {
-    throw new Error(`Player ${player.id} has no character`);
+    throw new Error(t('frontend.errors.playerHasNoCharacter', { id: player.id }));
   }
   const character = characters.find((c) => c.name === playerCharacter);
 
@@ -45,7 +46,7 @@ export const Player = ({
   if (!character) {
     if (!logged.has(playerCharacter)) {
       logged.add(playerCharacter);
-      toast.error(`Unknown character ${playerCharacter}`);
+      toast.error(t('frontend.errors.unknownCharacter', { character: playerCharacter }));
     }
     return null;
   }

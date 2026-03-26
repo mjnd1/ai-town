@@ -9,6 +9,7 @@ import { Id } from '../../../convex/_generated/dataModel';
 import { useCallback } from 'react';
 import { waitForInput } from '../../hooks/sendInput';
 import { useServerGame } from '../../hooks/serverGame';
+import { t } from '../../../locales';
 
 export default function InteractButton() {
   // const { isAuthenticated } = useConvexAuth();
@@ -53,10 +54,10 @@ export default function InteractButton() {
       return;
     }
     if (isPlaying) {
-      console.log(`Leaving game for player ${userPlayerId}`);
+      console.log(t('frontend.logs.leaveGame', { playerId: userPlayerId ?? '' }));
       void leave({ worldId });
     } else {
-      console.log(`Joining game`);
+      console.log(t('frontend.logs.joinGame'));
       void joinInput(worldId);
     }
   };
@@ -69,7 +70,7 @@ export default function InteractButton() {
   // }
   return (
     <Button imgUrl={interactImg} onClick={joinOrLeaveGame}>
-      {isPlaying ? 'Leave' : 'Interact'}
+      {isPlaying ? t('buttons.leave') : t('buttons.interact')}
     </Button>
   );
 }

@@ -1,4 +1,5 @@
 // That's right! No imports and no dependencies 🤯
+import { t } from '../../locales';
 
 const OPENAI_EMBEDDING_DIMENSION = 1536;
 const TOGETHER_EMBEDDING_DIMENSION = 768;
@@ -10,25 +11,19 @@ export function detectMismatchedLLMProvider() {
   switch (EMBEDDING_DIMENSION) {
     case OPENAI_EMBEDDING_DIMENSION:
       if (!process.env.OPENAI_API_KEY) {
-        throw new Error(
-          "Are you trying to use OpenAI? If so, run: npx convex env set OPENAI_API_KEY 'your-key'",
-        );
+        throw new Error(t('backend.llm.openAiKeyRequired'));
       }
       break;
     case TOGETHER_EMBEDDING_DIMENSION:
       if (!process.env.TOGETHER_API_KEY) {
-        throw new Error(
-          "Are you trying to use Together.ai? If so, run: npx convex env set TOGETHER_API_KEY 'your-key'",
-        );
+        throw new Error(t('backend.llm.togetherKeyRequired'));
       }
       break;
     case OLLAMA_EMBEDDING_DIMENSION:
       break;
     default:
       if (!process.env.LLM_API_URL) {
-        throw new Error(
-          "Are you trying to use a custom cloud-hosted LLM? If so, run: npx convex env set LLM_API_URL 'your-url'",
-        );
+        throw new Error(t('backend.llm.customUrlRequired'));
       }
       break;
   }
@@ -47,7 +42,7 @@ export function getLLMConfig(): LLMConfig {
   let provider = process.env.LLM_PROVIDER;
   if (provider ? provider === 'openai' : process.env.OPENAI_API_KEY) {
     if (EMBEDDING_DIMENSION !== OPENAI_EMBEDDING_DIMENSION) {
-      throw new Error('EMBEDDING_DIMENSION must be 1536 for OpenAI');
+      throw new Error(t('backend.llm.openAiDimensionRequired'));
     }
     return {
       provider: 'openai',
@@ -60,7 +55,7 @@ export function getLLMConfig(): LLMConfig {
   }
   if (process.env.TOGETHER_API_KEY) {
     if (EMBEDDING_DIMENSION !== TOGETHER_EMBEDDING_DIMENSION) {
-      throw new Error('EMBEDDING_DIMENSION must be 768 for Together.ai');
+      throw new Error(t('backend.llm.togetherDimensionRequired'));
     }
     return {
       provider: 'together',
@@ -76,9 +71,9 @@ export function getLLMConfig(): LLMConfig {
     const apiKey = process.env.LLM_API_KEY;
     const url = process.env.LLM_API_URL;
     const chatModel = process.env.LLM_MODEL;
-    if (!chatModel) throw new Error('LLM_MODEL is required');
+    if (!chatModel) throw new Error(t('backend.llm.llmModelRequired'));
     const embeddingModel = process.env.LLM_EMBEDDING_MODEL;
-    if (!embeddingModel) throw new Error('LLM_EMBEDDING_MODEL is required');
+    if (!embeddingModel) throw new Error(t('backend.llm.llmEmbeddingModelRequired'));
     return {
       provider: 'custom',
       url,
@@ -92,8 +87,7 @@ export function getLLMConfig(): LLMConfig {
   if (EMBEDDING_DIMENSION !== OLLAMA_EMBEDDING_DIMENSION) {
     detectMismatchedLLMProvider();
     throw new Error(
-      `Unknown EMBEDDING_DIMENSION ${EMBEDDING_DIMENSION} found` +
-        `. See convex/util/llm.ts for details.`,
+      t('backend.llm.unknownEmbeddingDimension', { dimension: EMBEDDING_DIMENSION }),
     );
   }
   // Alternative embedding model:
@@ -164,7 +158,9 @@ export async function chatCompletion(
       }
       throw {
         retry: result.status === 429 || result.status >= 500,
-        error: new Error(`Chat completion failed with code ${result.status}: ${error}`),
+        error: new Error(
+          t('backend.llm.chatCompletionFailed', { status: result.status, error }),
+        ),
       };
     }
     if (body.stream) {
@@ -173,7 +169,7 @@ export async function chatCompletion(
       const json = (await result.json()) as CreateChatCompletionResponse;
       const content = json.choices[0].message?.content;
       if (content === undefined) {
-        throw new Error('Unexpected result from OpenAI: ' + JSON.stringify(json));
+        throw new Error(t('backend.llm.unexpectedOpenAiResult', { json: JSON.stringify(json) }));
       }
       console.log(content);
       return content;
@@ -189,7 +185,7 @@ export async function chatCompletion(
 
 export async function tryPullOllama(model: string, error: string) {
   if (error.includes('try pulling')) {
-    console.error('Embedding model not found, pulling from Ollama');
+    console.error(t('backend.llm.embeddingModelPulling'));
     const pullResp = await fetch(getLLMConfig().url + '/api/pull', {
       method: 'POST',
       headers: {
@@ -197,7 +193,7 @@ export async function tryPullOllama(model: string, error: string) {
       },
       body: JSON.stringify({ name: model }),
     });
-    console.log('Pull response', await pullResp.text());
+    console.log(t('backend.llm.pullResponse', { response: await pullResp.text() }));
     throw { retry: true, error: `Dynamically pulled model. Original error: ${error}` };
   }
 }
@@ -232,14 +228,19 @@ export async function fetchEmbeddingBatch(texts: string[]) {
     if (!result.ok) {
       throw {
         retry: result.status === 429 || result.status >= 500,
-        error: new Error(`Embedding failed with code ${result.status}: ${await result.text()}`),
+        error: new Error(
+          t('backend.llm.embeddingFailed', {
+            status: result.status,
+            error: await result.text(),
+          }),
+        ),
       };
     }
     return (await result.json()) as CreateEmbeddingResponse;
   });
   if (json.data.length !== texts.length) {
     console.error(json);
-    throw new Error('Unexpected number of embeddings');
+    throw new Error(t('backend.llm.unexpectedEmbeddingCount'));
   }
   const allembeddings = json.data;
   allembeddings.sort((a, b) => a.index - b.index);
@@ -273,7 +274,12 @@ export async function fetchModeration(content: string) {
     if (!result.ok) {
       throw {
         retry: result.status === 429 || result.status >= 500,
-        error: new Error(`Embedding failed with code ${result.status}: ${await result.text()}`),
+        error: new Error(
+          t('backend.llm.embeddingFailed', {
+            status: result.status,
+            error: await result.text(),
+          }),
+        ),
       };
     }
     return (await result.json()) as { results: { flagged: boolean }[] };
@@ -301,7 +307,10 @@ export async function retryWithBackoff<T>(
       if (i < RETRY_BACKOFF.length) {
         if (retryError.retry) {
           console.log(
-            `Attempt ${i + 1} failed, waiting ${RETRY_BACKOFF[i]}ms to retry...`,
+            t('backend.llm.retryingAttempt', {
+              attempt: i + 1,
+              wait: RETRY_BACKOFF[i],
+            }),
             Date.now(),
           );
           await new Promise((resolve) =>
@@ -314,7 +323,7 @@ export async function retryWithBackoff<T>(
       else throw e;
     }
   }
-  throw new Error('Unreachable');
+  throw new Error(t('backend.llm.unreachable'));
 }
 
 // Lifted from openai's package
@@ -698,7 +707,7 @@ export async function ollamaFetchEmbedding(text: string) {
     if (resp.status === 404) {
       const error = await resp.text();
       await tryPullOllama(config.embeddingModel, error);
-      throw new Error(`Failed to fetch embeddings: ${resp.status}`);
+      throw new Error(t('backend.llm.failedToFetchEmbeddings', { status: resp.status }));
     }
     return (await resp.json()).embedding as number[];
   });

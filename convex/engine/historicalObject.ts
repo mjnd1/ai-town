@@ -8,6 +8,7 @@ import {
   runLengthDecode,
   unquantize,
 } from '../util/compression';
+import { t } from '../../locales';
 
 // `HistoricalObject`s require the developer to pass in the
 // field names that'll be tracked and sent down to the client.
@@ -79,7 +80,7 @@ export class HistoricalObject<T extends Record<string, number>> {
 
   constructor(fields: FieldConfig, initialValue: T) {
     if (fields.length >= MAX_FIELDS) {
-      throw new Error(`HistoricalObject can have at most ${MAX_FIELDS} fields.`);
+      throw new Error(t('backend.historicalObject.tooManyFields', { count: MAX_FIELDS }));
     }
     this.fieldConfig = normalizeFieldConfig(fields);
     this.checkShape(initialValue);
@@ -95,12 +96,10 @@ export class HistoricalObject<T extends Record<string, number>> {
   checkShape(data: any) {
     for (const [key, value] of Object.entries(data)) {
       if (!this.fieldConfig.find((f) => f.name === key)) {
-        throw new Error(`Cannot set undeclared field '${key}'`);
+        throw new Error(t('backend.historicalObject.undeclaredField', { key }));
       }
       if (typeof value !== 'number') {
-        throw new Error(
-          `HistoricalObject only supports numeric values, found: ${JSON.stringify(value)}`,
-        );
+        throw new Error(t('backend.historicalObject.numericOnly', { value: JSON.stringify(value) }));
       }
     }
   }
@@ -119,7 +118,12 @@ export class HistoricalObject<T extends Record<string, number>> {
         if (samples.length > 0) {
           const last = samples[samples.length - 1];
           if (now < last.time) {
-            throw new Error(`Server time moving backwards: ${now} < ${last.time}`);
+            throw new Error(
+              t('backend.historicalObject.serverTimeBackwards', {
+                now,
+                last: last.time,
+              }),
+            );
           }
           if (now === last.time) {
             last.value = value;
@@ -234,7 +238,11 @@ export function packSampleRecord(
     const encodedTimestamps = runLengthEncode(deltaEncode(timestamps.slice(1), initialTimestamp));
     const compressedTimestamps = compressSigned(encodedTimestamps);
     if (compressedTimestamps.byteLength >= 1 << 16) {
-      throw new Error(`Compressed buffer too long: ${compressedTimestamps.byteLength}`);
+      throw new Error(
+        t('backend.historicalObject.compressedBufferTooLong', {
+          length: compressedTimestamps.byteLength,
+        }),
+      );
     }
 
     const values = [history.initialValue, ...history.samples.map((s) => s.value)];
@@ -253,7 +261,11 @@ export function packSampleRecord(
     const encoded = useRLE ? runLengthEncoded : deltaEncoded;
     const compressed = compressSigned(encoded);
     if (compressed.byteLength >= 1 << 16) {
-      throw new Error(`Compressed buffer too long: ${compressed.byteLength}`);
+      throw new Error(
+        t('backend.historicalObject.compressedBufferTooLong', {
+          length: compressed.byteLength,
+        }),
+      );
     }
 
     outView.setUint8(pos, fieldHeader);
@@ -291,7 +303,12 @@ export function unpackSampleRecord(fields: FieldConfig, buffer: ArrayBuffer) {
   pos += 4;
 
   if (configHash !== expectedConfigHash) {
-    throw new Error(`Config hash mismatch: ${configHash} !== ${expectedConfigHash}`);
+    throw new Error(
+      t('backend.historicalObject.configHashMismatch', {
+        actual: configHash,
+        expected: expectedConfigHash,
+      }),
+    );
   }
 
   const out = {} as Record<string, History>;
@@ -303,7 +320,7 @@ export function unpackSampleRecord(fields: FieldConfig, buffer: ArrayBuffer) {
     const useRLE = (fieldHeader & (1 << 4)) !== 0;
     const fieldConfig = normalizedFields[fieldNumber];
     if (!fieldConfig) {
-      throw new Error(`Invalid field number: ${fieldNumber}`);
+      throw new Error(t('backend.historicalObject.invalidFieldNumber', { fieldNumber }));
     }
 
     const initialTimestamp = Number(view.getBigUint64(pos, true));
@@ -335,7 +352,12 @@ export function unpackSampleRecord(fields: FieldConfig, buffer: ArrayBuffer) {
     const values = unquantize(quantized, fieldConfig.precision);
 
     if (timestamps.length + 1 !== values.length) {
-      throw new Error(`Invalid sample record: ${timestamps.length} + 1 !== ${values.length}`);
+      throw new Error(
+        t('backend.historicalObject.invalidSampleRecord', {
+          timestamps: timestamps.length,
+          values: values.length,
+        }),
+      );
     }
     const initialValue = values[0];
     const samples = [];

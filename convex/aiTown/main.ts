@@ -6,6 +6,7 @@ import { internal } from '../_generated/api';
 import { sleep } from '../util/sleep';
 import { Id } from '../_generated/dataModel';
 import { ENGINE_ACTION_DURATION } from '../constants';
+import { t } from '../../locales';
 
 export async function createEngine(ctx: MutationCtx) {
   const now = Date.now();
@@ -23,7 +24,7 @@ async function loadWorldStatus(db: DatabaseReader, worldId: Id<'worlds'>) {
     .withIndex('worldId', (q) => q.eq('worldId', worldId))
     .unique();
   if (!worldStatus) {
-    throw new Error(`No engine found for world ${worldId}`);
+    throw new Error(t('backend.main.noEngineForWorld', { id: worldId }));
   }
   return worldStatus;
 }
@@ -32,10 +33,10 @@ export async function startEngine(ctx: MutationCtx, worldId: Id<'worlds'>) {
   const { engineId } = await loadWorldStatus(ctx.db, worldId);
   const engine = await ctx.db.get(engineId);
   if (!engine) {
-    throw new Error(`Invalid engine ID: ${engineId}`);
+    throw new Error(t('backend.main.invalidEngineId', { id: engineId }));
   }
   if (engine.running) {
-    throw new Error(`Engine ${engineId} isn't currently stopped`);
+    throw new Error(t('backend.main.engineNotStopped', { id: engineId }));
   }
   const now = Date.now();
   const generationNumber = engine.generationNumber + 1;
@@ -60,10 +61,10 @@ export async function kickEngine(ctx: MutationCtx, worldId: Id<'worlds'>) {
   const { engineId } = await loadWorldStatus(ctx.db, worldId);
   const engine = await ctx.db.get(engineId);
   if (!engine) {
-    throw new Error(`Invalid engine ID: ${engineId}`);
+    throw new Error(t('backend.main.invalidEngineId', { id: engineId }));
   }
   if (!engine.running) {
-    throw new Error(`Engine ${engineId} isn't currently running`);
+    throw new Error(t('backend.main.engineNotRunning', { id: engineId }));
   }
   const generationNumber = engine.generationNumber + 1;
   await ctx.db.patch(engineId, { generationNumber });
@@ -78,10 +79,10 @@ export async function stopEngine(ctx: MutationCtx, worldId: Id<'worlds'>) {
   const { engineId } = await loadWorldStatus(ctx.db, worldId);
   const engine = await ctx.db.get(engineId);
   if (!engine) {
-    throw new Error(`Invalid engine ID: ${engineId}`);
+    throw new Error(t('backend.main.invalidEngineId', { id: engineId }));
   }
   if (!engine.running) {
-    throw new Error(`Engine ${engineId} isn't currently running`);
+    throw new Error(t('backend.main.engineNotRunning', { id: engineId }));
   }
   await ctx.db.patch(engineId, { running: false });
 }
@@ -116,11 +117,11 @@ export const runStep = internalAction({
     } catch (e: unknown) {
       if (e instanceof ConvexError) {
         if (e.data.kind === 'engineNotRunning') {
-          console.debug(`Engine is not running: ${e.message}`);
+          console.debug(t('backend.main.engineNotRunningDebug', { message: e.message }));
           return;
         }
         if (e.data.kind === 'generationNumber') {
-          console.debug(`Generation number mismatch: ${e.message}`);
+          console.debug(t('backend.main.generationMismatch', { message: e.message }));
           return;
         }
       }
@@ -147,7 +148,7 @@ export const inputStatus = query({
   handler: async (ctx, args) => {
     const input = await ctx.db.get(args.inputId);
     if (!input) {
-      throw new Error(`Invalid input ID: ${args.inputId}`);
+      throw new Error(t('backend.main.invalidInputId', { id: args.inputId }));
     }
     return input.returnValue ?? null;
   },

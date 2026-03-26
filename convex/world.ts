@@ -11,6 +11,7 @@ import {
 import { playerId } from './aiTown/ids';
 import { kickEngine, startEngine, stopEngine } from './aiTown/main';
 import { engineInsertInput } from './engine/abstractGame';
+import { t } from '../locales';
 
 export const defaultWorldStatus = query({
   handler: async (ctx) => {
@@ -32,7 +33,7 @@ export const heartbeatWorld = mutation({
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId))
       .first();
     if (!worldStatus) {
-      throw new Error(`Invalid world ID: ${args.worldId}`);
+      throw new Error(t('backend.world.invalidWorldId', { id: args.worldId }));
     }
     const now = Date.now();
 
@@ -46,10 +47,10 @@ export const heartbeatWorld = mutation({
 
     // Restart inactive worlds, but leave worlds explicitly stopped by the developer alone.
     if (worldStatus.status === 'stoppedByDeveloper') {
-      console.debug(`World ${worldStatus._id} is stopped by developer, not restarting.`);
+      console.debug(t('backend.world.worldStoppedByDeveloper', { id: worldStatus._id }));
     }
     if (worldStatus.status === 'inactive') {
-      console.log(`Restarting inactive world ${worldStatus._id}...`);
+      console.log(t('backend.world.restartingInactiveWorld', { id: worldStatus._id }));
       await ctx.db.patch(worldStatus._id, { status: 'running' });
       await startEngine(ctx, worldStatus.worldId);
     }
@@ -64,7 +65,7 @@ export const stopInactiveWorlds = internalMutation({
       if (cutoff < worldStatus.lastViewed || worldStatus.status !== 'running') {
         continue;
       }
-      console.log(`Stopping inactive world ${worldStatus._id}`);
+      console.log(t('backend.world.stoppingInactiveWorld', { id: worldStatus._id }));
       await ctx.db.patch(worldStatus._id, { status: 'inactive' });
       await stopEngine(ctx, worldStatus.worldId);
     }
@@ -84,10 +85,10 @@ export const restartDeadWorlds = internalMutation({
       }
       const engine = await ctx.db.get(worldStatus.engineId);
       if (!engine) {
-        throw new Error(`Invalid engine ID: ${worldStatus.engineId}`);
+        throw new Error(t('backend.world.invalidEngineId', { id: worldStatus.engineId }));
       }
       if (engine.currentTime && engine.currentTime < engineTimeout) {
-        console.warn(`Restarting dead engine ${engine._id}...`);
+        console.warn(t('backend.world.restartingDeadEngine', { id: engine._id }));
         await kickEngine(ctx, worldStatus.worldId);
       }
     }
@@ -126,13 +127,13 @@ export const joinWorld = mutation({
     // }
     const world = await ctx.db.get(args.worldId);
     if (!world) {
-      throw new ConvexError(`Invalid world ID: ${args.worldId}`);
+      throw new ConvexError(t('backend.world.invalidWorldId', { id: args.worldId }));
     }
     // const { tokenIdentifier } = identity;
     return await insertInput(ctx, world._id, 'join', {
       name,
       character: characters[Math.floor(Math.random() * characters.length)].name,
-      description: `${DEFAULT_NAME} is a human player`,
+      description: t('constants.humanDescription', { name }),
       // description: `${identity.givenName} is a human player`,
       tokenIdentifier: DEFAULT_NAME,
     });
@@ -151,7 +152,7 @@ export const leaveWorld = mutation({
     // const { tokenIdentifier } = identity;
     const world = await ctx.db.get(args.worldId);
     if (!world) {
-      throw new Error(`Invalid world ID: ${args.worldId}`);
+      throw new Error(t('backend.world.invalidWorldId', { id: args.worldId }));
     }
     // const existingPlayer = world.players.find((p) => p.human === tokenIdentifier);
     const existingPlayer = world.players.find((p) => p.human === DEFAULT_NAME);
@@ -186,18 +187,18 @@ export const worldState = query({
   handler: async (ctx, args) => {
     const world = await ctx.db.get(args.worldId);
     if (!world) {
-      throw new Error(`Invalid world ID: ${args.worldId}`);
+      throw new Error(t('backend.world.invalidWorldId', { id: args.worldId }));
     }
     const worldStatus = await ctx.db
       .query('worldStatus')
       .withIndex('worldId', (q) => q.eq('worldId', world._id))
       .unique();
     if (!worldStatus) {
-      throw new Error(`Invalid world status ID: ${world._id}`);
+      throw new Error(t('backend.world.invalidWorldStatusId', { id: world._id }));
     }
     const engine = await ctx.db.get(worldStatus.engineId);
     if (!engine) {
-      throw new Error(`Invalid engine ID: ${worldStatus.engineId}`);
+      throw new Error(t('backend.world.invalidEngineId', { id: worldStatus.engineId }));
     }
     return { world, engine };
   },
@@ -221,7 +222,7 @@ export const gameDescriptions = query({
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId))
       .first();
     if (!worldMap) {
-      throw new Error(`No map for world: ${args.worldId}`);
+      throw new Error(t('backend.world.noMapForWorld', { id: args.worldId }));
     }
     return { worldMap, playerDescriptions, agentDescriptions };
   },
@@ -246,7 +247,9 @@ export const previousConversation = query({
         .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('id', member.conversationId))
         .unique();
       if (!conversation) {
-        throw new Error(`Invalid conversation ID: ${member.conversationId}`);
+        throw new Error(
+          t('backend.world.invalidConversationId', { id: member.conversationId }),
+        );
       }
       if (conversation.numMessages > 0) {
         return conversation;

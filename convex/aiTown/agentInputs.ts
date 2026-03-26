@@ -8,6 +8,7 @@ import { point } from '../util/types';
 import { Descriptions } from '../../data/characters';
 import { AgentDescription } from './agentDescription';
 import { Agent } from './agent';
+import { t } from '../../locales';
 
 export const agentInputs = {
   finishRememberConversation: inputHandler({
@@ -19,13 +20,18 @@ export const agentInputs = {
       const agentId = parseGameId('agents', args.agentId);
       const agent = game.world.agents.get(agentId);
       if (!agent) {
-        throw new Error(`Couldn't find agent: ${agentId}`);
+        throw new Error(t('backend.agentInputs.agentNotFound', { id: agentId }));
       }
       if (
         !agent.inProgressOperation ||
         agent.inProgressOperation.operationId !== args.operationId
       ) {
-        console.debug(`Agent ${agentId} isn't remembering ${args.operationId}`);
+        console.debug(
+          t('backend.agentInputs.agentNotRemembering', {
+            agentId,
+            operationId: args.operationId,
+          }),
+        );
       } else {
         delete agent.inProgressOperation;
         delete agent.toRemember;
@@ -45,13 +51,18 @@ export const agentInputs = {
       const agentId = parseGameId('agents', args.agentId);
       const agent = game.world.agents.get(agentId);
       if (!agent) {
-        throw new Error(`Couldn't find agent: ${agentId}`);
+        throw new Error(t('backend.agentInputs.agentNotFound', { id: agentId }));
       }
       if (
         !agent.inProgressOperation ||
         agent.inProgressOperation.operationId !== args.operationId
       ) {
-        console.debug(`Agent ${agentId} didn't have ${args.operationId} in progress`);
+        console.debug(
+          t('backend.agentInputs.agentNoOperationInProgress', {
+            agentId,
+            operationId: args.operationId,
+          }),
+        );
         return null;
       }
       delete agent.inProgressOperation;
@@ -60,7 +71,7 @@ export const agentInputs = {
         const inviteeId = parseGameId('players', args.invitee);
         const invitee = game.world.players.get(inviteeId);
         if (!invitee) {
-          throw new Error(`Couldn't find player: ${inviteeId}`);
+          throw new Error(t('backend.agentInputs.playerNotFound', { id: inviteeId }));
         }
         Conversation.start(game, now, player, invitee);
         agent.lastInviteAttempt = now;
@@ -86,22 +97,27 @@ export const agentInputs = {
       const agentId = parseGameId('agents', args.agentId);
       const agent = game.world.agents.get(agentId);
       if (!agent) {
-        throw new Error(`Couldn't find agent: ${agentId}`);
+        throw new Error(t('backend.agentInputs.agentNotFound', { id: agentId }));
       }
       const player = game.world.players.get(agent.playerId);
       if (!player) {
-        throw new Error(`Couldn't find player: ${agent.playerId}`);
+        throw new Error(t('backend.agentInputs.playerNotFound', { id: agent.playerId }));
       }
       const conversationId = parseGameId('conversations', args.conversationId);
       const conversation = game.world.conversations.get(conversationId);
       if (!conversation) {
-        throw new Error(`Couldn't find conversation: ${conversationId}`);
+        throw new Error(t('backend.agentInputs.conversationNotFound', { id: conversationId }));
       }
       if (
         !agent.inProgressOperation ||
         agent.inProgressOperation.operationId !== args.operationId
       ) {
-        console.debug(`Agent ${agentId} wasn't sending a message ${args.operationId}`);
+        console.debug(
+          t('backend.agentInputs.agentNotSendingMessage', {
+            agentId,
+            operationId: args.operationId,
+          }),
+        );
         return null;
       }
       delete agent.inProgressOperation;

@@ -7,6 +7,7 @@ import { asyncMap } from '../util/asyncMap';
 import { GameId, agentId, conversationId, playerId } from '../aiTown/ids';
 import { SerializedPlayer } from '../aiTown/player';
 import { memoryFields } from './schema';
+import { t } from '../../locales';
 
 // How long to wait before updating a memory's last access time.
 export const MEMORY_ACCESS_THROTTLE = 300_000; // In ms
@@ -42,9 +43,10 @@ export async function rememberConversation(
   const llmMessages: LLMMessage[] = [
     {
       role: 'user',
-      content: `You are ${player.name}, and you just finished a conversation with ${otherPlayer.name}. I would
-      like you to summarize the conversation from ${player.name}'s perspective, using first-person pronouns like
-      "I," and add if you liked or disliked this interaction.`,
+      content: t('backend.memory.summaryPrompt', {
+        playerName: player.name,
+        otherPlayerName: otherPlayer.name,
+      }),
     },
   ];
   const authors = new Set<GameId<'players'>>();
@@ -54,17 +56,23 @@ export async function rememberConversation(
     const recipient = message.author === player.id ? otherPlayer : player;
     llmMessages.push({
       role: 'user',
-      content: `${author.name} to ${recipient.name}: ${message.text}`,
+      content: t('backend.memory.statementPrompt', {
+        author: author.name,
+        recipient: recipient.name,
+        text: message.text,
+      }),
     });
   }
-  llmMessages.push({ role: 'user', content: 'Summary:' });
+  llmMessages.push({ role: 'user', content: t('backend.memory.summaryLabel') });
   const { content } = await chatCompletion({
     messages: llmMessages,
     max_tokens: 500,
   });
-  const description = `Conversation with ${otherPlayer.name} at ${new Date(
-    data.conversation._creationTime,
-  ).toLocaleString()}: ${content}`;
+  const description = t('backend.memory.conversationMemory', {
+    name: otherPlayer.name,
+    time: new Date(data.conversation._creationTime).toLocaleString(),
+    content,
+  });
   const importance = await calculateImportance(description);
   const { embedding } = await fetchEmbedding(description);
   authors.delete(player.id as GameId<'players'>);
@@ -94,25 +102,27 @@ export const loadConversation = internalQuery({
   handler: async (ctx, args) => {
     const world = await ctx.db.get(args.worldId);
     if (!world) {
-      throw new Error(`World ${args.worldId} not found`);
+      throw new Error(t('backend.memory.worldNotFound', { id: args.worldId }));
     }
     const player = world.players.find((p) => p.id === args.playerId);
     if (!player) {
-      throw new Error(`Player ${args.playerId} not found`);
+      throw new Error(t('backend.memory.playerNotFound', { id: args.playerId }));
     }
     const playerDescription = await ctx.db
       .query('playerDescriptions')
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', args.playerId))
       .first();
     if (!playerDescription) {
-      throw new Error(`Player description for ${args.playerId} not found`);
+      throw new Error(
+        t('backend.memory.playerDescriptionNotFound', { id: args.playerId }),
+      );
     }
     const conversation = await ctx.db
       .query('archivedConversations')
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('id', args.conversationId))
       .first();
     if (!conversation) {
-      throw new Error(`Conversation ${args.conversationId} not found`);
+      throw new Error(t('backend.memory.conversationNotFound', { id: args.conversationId }));
     }
     const otherParticipator = await ctx.db
       .query('participatedTogether')
@@ -125,7 +135,10 @@ export const loadConversation = internalQuery({
       .first();
     if (!otherParticipator) {
       throw new Error(
-        `Couldn't find other participant in conversation ${args.conversationId} with player ${args.playerId}`,
+        t('backend.memory.otherParticipantNotFound', {
+          conversationId: args.conversationId,
+          playerId: args.playerId,
+        }),
       );
     }
     const otherPlayerId = otherParticipator.player2;
@@ -138,14 +151,18 @@ export const loadConversation = internalQuery({
         .first();
     }
     if (!otherPlayer) {
-      throw new Error(`Conversation ${args.conversationId} other player not found`);
+      throw new Error(
+        t('backend.memory.otherPlayerNotFound', { conversationId: args.conversationId }),
+      );
     }
     const otherPlayerDescription = await ctx.db
       .query('playerDescriptions')
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', otherPlayerId))
       .first();
     if (!otherPlayerDescription) {
-      throw new Error(`Player description for ${otherPlayerId} not found`);
+      throw new Error(
+        t('backend.memory.playerDescriptionNotFound', { id: otherPlayerId }),
+      );
     }
     return {
       player: { ...player, name: playerDescription.name },
@@ -196,7 +213,9 @@ export const rankAndTouchMemories = internalMutation({
         .query('memories')
         .withIndex('embeddingId', (q) => q.eq('embeddingId', _id))
         .first();
-      if (!memory) throw new Error(`Memory for embedding ${_id} not found`);
+      if (!memory) {
+        throw new Error(t('backend.memory.memoryForEmbeddingNotFound', { id: _id }));
+      }
       return memory;
     });
 
@@ -248,9 +267,7 @@ async function calculateImportance(description: string) {
     messages: [
       {
         role: 'user',
-        content: `On the scale of 0 to 9, where 0 is purely mundane (e.g., brushing teeth, making bed) and 9 is extremely poignant (e.g., a break up, college acceptance), rate the likely poignancy of the following piece of memory.
-      Memory: ${description}
-      Answer on a scale of 0 to 9. Respond with number only, e.g. "5"`,
+        content: t('backend.memory.importancePrompt', { description }),
       },
     ],
     temperature: 0.0,
@@ -262,8 +279,8 @@ async function calculateImportance(description: string) {
     importance = +(importanceRaw.match(/\d+/)?.[0] ?? NaN);
   }
   if (isNaN(importance)) {
-    console.debug('Could not parse memory importance from: ', importanceRaw);
-    importance = 5;
+    console.debug(t('backend.memory.importanceParseFailed', { value: importanceRaw }));
+    importance = Number(t('backend.memory.importanceFallback'));
   }
   return importance;
 }
@@ -345,19 +362,19 @@ async function reflectOnMemories(
   if (!shouldReflect) {
     return false;
   }
-  console.debug('sum of importance score = ', sumOfImportanceScore);
-  console.debug('Reflecting...');
-  const prompt = ['[no prose]', '[Output only JSON]', `You are ${name}, statements about you:`];
+  console.debug(t('backend.memory.sumImportanceScore', { score: sumOfImportanceScore }));
+  console.debug(t('backend.memory.reflecting'));
+  const prompt = [
+    t('backend.memory.reflectionNoProse'),
+    t('backend.memory.reflectionOutputJson'),
+    t('backend.memory.reflectionStatementsAboutYou', { name }),
+  ];
   memories.forEach((m, idx) => {
-    prompt.push(`Statement ${idx}: ${m.description}`);
+    prompt.push(t('backend.memory.reflectionStatement', { index: idx, description: m.description }));
   });
-  prompt.push('What 3 high-level insights can you infer from the above statements?');
-  prompt.push(
-    'Return in JSON format, where the key is a list of input statements that contributed to your insights and value is your insight. Make the response parseable by Typescript JSON.parse() function. DO NOT escape characters or include "\n" or white space in response.',
-  );
-  prompt.push(
-    'Example: [{insight: "...", statementIds: [1,2]}, {insight: "...", statementIds: [1]}, ...]',
-  );
+  prompt.push(t('backend.memory.reflectionAskInsights'));
+  prompt.push(t('backend.memory.reflectionReturnFormat'));
+  prompt.push(t('backend.memory.reflectionExample'));
 
   const { content: reflection } = await chatCompletion({
     messages: [
@@ -374,7 +391,7 @@ async function reflectOnMemories(
       const relatedMemoryIds = item.statementIds.map((idx: number) => memories[idx]._id);
       const importance = await calculateImportance(item.insight);
       const { embedding } = await fetchEmbedding(item.insight);
-      console.debug('adding reflection memory...', item.insight);
+      console.debug(t('backend.memory.addingReflectionMemory', { insight: item.insight }));
       return {
         description: item.insight,
         embedding,
@@ -389,8 +406,8 @@ async function reflectOnMemories(
       reflections: memoriesToSave,
     });
   } catch (e) {
-    console.error('error saving or parsing reflection', e);
-    console.debug('reflection', reflection);
+    console.error(t('backend.memory.errorSavingOrParsingReflection'), e);
+    console.debug(t('backend.memory.reflectionResult', { reflection }));
     return false;
   }
   return true;
@@ -400,18 +417,20 @@ export const getReflectionMemories = internalQuery({
   handler: async (ctx, args) => {
     const world = await ctx.db.get(args.worldId);
     if (!world) {
-      throw new Error(`World ${args.worldId} not found`);
+      throw new Error(t('backend.memory.worldNotFound', { id: args.worldId }));
     }
     const player = world.players.find((p) => p.id === args.playerId);
     if (!player) {
-      throw new Error(`Player ${args.playerId} not found`);
+      throw new Error(t('backend.memory.playerNotFound', { id: args.playerId }));
     }
     const playerDescription = await ctx.db
       .query('playerDescriptions')
       .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', args.playerId))
       .first();
     if (!playerDescription) {
-      throw new Error(`Player description for ${args.playerId} not found`);
+      throw new Error(
+        t('backend.memory.playerDescriptionNotFound', { id: args.playerId }),
+      );
     }
     const memories = await ctx.db
       .query('memories')

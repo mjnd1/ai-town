@@ -6,6 +6,7 @@ import { MessageInput } from './MessageInput';
 import { Player } from '../../convex/aiTown/player';
 import { Conversation } from '../../convex/aiTown/conversation';
 import { useEffect, useRef } from 'react';
+import { t } from '../../locales';
 
 export function Messages({
   worldId,
@@ -99,7 +100,9 @@ export function Messages({
         membershipNodes.push({
           node: (
             <div key={`joined-${playerId}`} className="leading-tight mb-6">
-              <p className="text-brown-700 text-center">{playerName} joined the conversation.</p>
+              <p className="text-brown-700 text-center">
+                {t('messages.joinedConversation', { name: playerName ?? '' })}
+              </p>
             </div>
           ),
           time: started,
@@ -114,7 +117,9 @@ export function Messages({
       membershipNodes.push({
         node: (
           <div key={`joined-${playerId}`} className="leading-tight mb-6">
-            <p className="text-brown-700 text-center">{playerName} joined the conversation.</p>
+            <p className="text-brown-700 text-center">
+              {t('messages.joinedConversation', { name: playerName ?? '' })}
+            </p>
           </div>
         ),
         time: started,
@@ -123,7 +128,9 @@ export function Messages({
       membershipNodes.push({
         node: (
           <div key={`left-${playerId}`} className="leading-tight mb-6">
-            <p className="text-brown-700 text-center">{playerName} left the conversation.</p>
+            <p className="text-brown-700 text-center">
+              {t('messages.leftConversation', { name: playerName ?? '' })}
+            </p>
           </div>
         ),
         // Always sort all "left" messages after the last message.
@@ -148,7 +155,7 @@ export function Messages({
             </div>
             <div className={clsx('bubble')}>
               <p className="bg-white -mx-3 -my-1">
-                <i>typing...</i>
+                <i>{t('messages.typing')}</i>
               </p>
             </div>
           </div>

@@ -2,6 +2,7 @@ import { ConvexReactClient, useConvex } from 'convex/react';
 import { InputArgs, InputReturnValue, Inputs } from '../../convex/aiTown/inputs';
 import { api } from '../../convex/_generated/api';
 import { Id } from '../../convex/_generated/dataModel';
+import { t } from '../../locales';
 
 export async function waitForInput(convex: ConvexReactClient, inputId: Id<'inputs'>) {
   const watch = convex.watchQuery(api.aiTown.main.inputStatus, { inputId });
@@ -31,7 +32,7 @@ export async function waitForInput(convex: ConvexReactClient, inputId: Id<'input
     }
   }
   if (!result) {
-    throw new Error(`Input ${inputId} was never processed.`);
+    throw new Error(t('frontend.errors.inputNeverProcessed', { id: inputId }));
   }
   if (result.kind === 'error') {
     throw new Error(result.message);

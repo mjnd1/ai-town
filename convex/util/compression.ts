@@ -1,3 +1,5 @@
+import { t } from '../../locales';
+
 export function quantize(values: number[], precision: number) {
   const factor = 1 << precision;
   return values.map((v) => Math.floor(v * factor));
@@ -57,7 +59,7 @@ export function runLengthEncode(values: number[]) {
 
 export function runLengthDecode(encoded: number[]) {
   if (encoded.length % 2 !== 0) {
-    throw new Error(`Invalid RLE encoded length: ${encoded.length}`);
+    throw new Error(t('backend.compression.invalidRleLength', { length: encoded.length }));
   }
   const values = [];
   for (let i = 0; i < encoded.length; i += 2) {

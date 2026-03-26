@@ -4,6 +4,7 @@ import { internal } from './_generated/api';
 import { internalMutation } from './_generated/server';
 import { TableNames } from './_generated/dataModel';
 import { v } from 'convex/values';
+import { t } from '../locales';
 
 const crons = cronJobs();
 
@@ -42,13 +43,13 @@ export const vacuumOldEntries = internalMutation({
   handler: async (ctx, args) => {
     const before = Date.now() - VACUUM_MAX_AGE;
     for (const tableName of TablesToVacuum) {
-      console.log(`Checking ${tableName}...`);
+      console.log(t('backend.crons.checkingTable', { tableName }));
       const exists = await ctx.db
         .query(tableName)
         .withIndex('by_creation_time', (q) => q.lt('_creationTime', before))
         .first();
       if (exists) {
-        console.log(`Vacuuming ${tableName}...`);
+        console.log(t('backend.crons.vacuumingTable', { tableName }));
         await ctx.scheduler.runAfter(0, internal.crons.vacuumTable, {
           tableName,
           before,
@@ -83,7 +84,12 @@ export const vacuumTable = internalMutation({
         cursor: results.continueCursor,
       });
     } else {
-      console.log(`Vacuumed ${soFar + results.page.length} entries from ${tableName}`);
+      console.log(
+        t('backend.crons.vacuumedEntries', {
+          tableName,
+          count: soFar + results.page.length,
+        }),
+      );
     }
   },
 });

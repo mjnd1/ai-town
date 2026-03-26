@@ -6,6 +6,7 @@ import { Id } from '../../convex/_generated/dataModel';
 import { useSendInput } from '../hooks/sendInput';
 import { Player } from '../../convex/aiTown/player';
 import { Conversation } from '../../convex/aiTown/conversation';
+import { t } from '../../locales';
 
 export function MessageInput({
   worldId,
@@ -32,7 +33,6 @@ export function MessageInput({
 
     // Set the typing indicator if we're not submitting.
     if (e.key !== 'Enter') {
-      console.log(inflightUuid.current);
       if (currentlyTyping || inflightUuid.current !== undefined) {
         return;
       }
@@ -85,7 +85,7 @@ export function MessageInput({
           contentEditable
           style={{ outline: 'none' }}
           tabIndex={0}
-          placeholder="Type here"
+          placeholder={t('messages.inputPlaceholder')}
           onKeyDown={(e) => onKeyDown(e)}
         />
       </div>

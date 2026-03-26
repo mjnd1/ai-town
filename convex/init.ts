@@ -8,6 +8,7 @@ import { Id } from './_generated/dataModel';
 import { createEngine } from './aiTown/main';
 import { ENGINE_ACTION_DURATION } from './constants';
 import { detectMismatchedLLMProvider } from './util/llm';
+import { t } from '../locales';
 
 const init = mutation({
   args: {
@@ -18,7 +19,7 @@ const init = mutation({
     const { worldStatus, engine } = await getOrCreateDefaultWorld(ctx);
     if (worldStatus.status !== 'running') {
       console.warn(
-        `Engine ${engine._id} is not active! Run "npx convex run testing:resume" to restart it.`,
+        t('backend.init.engineNotActive', { id: engine._id }),
       );
       return;
     }
@@ -94,7 +95,7 @@ async function shouldCreateAgents(
 ) {
   const world = await db.get(worldId);
   if (!world) {
-    throw new Error(`Invalid world ID: ${worldId}`);
+    throw new Error(t('backend.world.invalidWorldId', { id: worldId }));
   }
   if (world.agents.length > 0) {
     return false;

@@ -16,6 +16,7 @@ import { fetchEmbedding } from './util/llm';
 import { chatCompletion } from './util/llm';
 import { startConversationMessage } from './agent/conversation';
 import { GameId } from './aiTown/ids';
+import { t } from '../locales';
 
 // Clear all of the tables except for the embeddings cache.
 const excludedTables: Array<TableNames> = ['embeddingsCache'];
@@ -67,16 +68,16 @@ export const stopAllowed = query({
 
 export const stop = mutation({
   handler: async (ctx) => {
-    if (process.env.STOP_NOT_ALLOWED) throw new Error('Stop not allowed');
+    if (process.env.STOP_NOT_ALLOWED) throw new Error(t('backend.testing.stopNotAllowed'));
     const { worldStatus, engine } = await getDefaultWorld(ctx.db);
     if (worldStatus.status === 'inactive' || worldStatus.status === 'stoppedByDeveloper') {
       if (engine.running) {
-        throw new Error(`Engine ${engine._id} isn't stopped?`);
+        throw new Error(t('backend.testing.engineIsntStopped', { id: engine._id }));
       }
-      console.debug(`World ${worldStatus.worldId} is already inactive`);
+      console.debug(t('backend.testing.worldAlreadyInactive', { id: worldStatus.worldId }));
       return;
     }
-    console.log(`Stopping engine ${engine._id}...`);
+    console.log(t('backend.testing.stoppingEngine', { id: engine._id }));
     await ctx.db.patch(worldStatus._id, { status: 'stoppedByDeveloper' });
     await stopEngine(ctx, worldStatus.worldId);
   },
@@ -87,13 +88,17 @@ export const resume = mutation({
     const { worldStatus, engine } = await getDefaultWorld(ctx.db);
     if (worldStatus.status === 'running') {
       if (!engine.running) {
-        throw new Error(`Engine ${engine._id} isn't running?`);
+        throw new Error(t('backend.testing.engineIsntRunning', { id: engine._id }));
       }
-      console.debug(`World ${worldStatus.worldId} is already running`);
+      console.debug(t('backend.testing.worldAlreadyRunning', { id: worldStatus.worldId }));
       return;
     }
     console.log(
-      `Resuming engine ${engine._id} for world ${worldStatus.worldId} (state: ${worldStatus.status})...`,
+      t('backend.testing.resumingEngine', {
+        engineId: engine._id,
+        worldId: worldStatus.worldId,
+        status: worldStatus.status,
+      }),
     );
     await ctx.db.patch(worldStatus._id, { status: 'running' });
     await startEngine(ctx, worldStatus.worldId);
@@ -104,9 +109,9 @@ export const archive = internalMutation({
   handler: async (ctx) => {
     const { worldStatus, engine } = await getDefaultWorld(ctx.db);
     if (engine.running) {
-      throw new Error(`Engine ${engine._id} is still running!`);
+      throw new Error(t('backend.testing.engineStillRunning', { id: engine._id }));
     }
-    console.log(`Archiving world ${worldStatus.worldId}...`);
+    console.log(t('backend.testing.archivingWorld', { id: worldStatus.worldId }));
     await ctx.db.patch(worldStatus._id, { isDefault: false });
   },
 });
@@ -117,11 +122,11 @@ async function getDefaultWorld(db: DatabaseReader) {
     .filter((q) => q.eq(q.field('isDefault'), true))
     .first();
   if (!worldStatus) {
-    throw new Error('No default world found');
+    throw new Error(t('backend.world.noDefaultWorld'));
   }
   const engine = await db.get(worldStatus.engineId);
   if (!engine) {
-    throw new Error(`Engine ${worldStatus.engineId} not found`);
+    throw new Error(t('backend.testing.engineNotFound', { id: worldStatus.engineId }));
   }
   return { worldStatus, engine };
 }
@@ -150,11 +155,11 @@ export const randomPositions = internalMutation({
       .withIndex('worldId', (q) => q.eq('worldId', worldStatus.worldId))
       .unique();
     if (!map) {
-      throw new Error(`No map for world ${worldStatus.worldId}`);
+      throw new Error(t('backend.testing.noMapForWorld', { id: worldStatus.worldId }));
     }
     const world = await ctx.db.get(worldStatus.worldId);
     if (!world) {
-      throw new Error(`No world for world ${worldStatus.worldId}`);
+      throw new Error(t('backend.testing.noWorldForWorld', { id: worldStatus.worldId }));
     }
     for (const player of world.players) {
       await insertInput(ctx, world._id, 'moveTo', {
@@ -180,8 +185,8 @@ export const testCompletion = internalAction({
   handler: async (ctx, args) => {
     return await chatCompletion({
       messages: [
-        { content: 'You are helpful', role: 'system' },
-        { content: 'Where is pizza?', role: 'user' },
+        { content: t('backend.testing.testHelpfulSystem'), role: 'system' },
+        { content: t('backend.testing.testHelpfulUser'), role: 'user' },
       ],
     });
   },

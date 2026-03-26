@@ -1,3 +1,7 @@
+import { getLocaleMessages } from '../locales';
+
+const localeMessages = getLocaleMessages();
+
 export const ACTION_TIMEOUT = 120_000; // more time for local dev
 // export const ACTION_TIMEOUT = 60_000;// normally fine
 
@@ -64,15 +68,11 @@ export const DELETE_BATCH_SIZE = 64;
 
 export const HUMAN_IDLE_TOO_LONG = 5 * 60 * 1000;
 
-export const ACTIVITIES = [
-  { description: 'reading a book', emoji: '📖', duration: 60_000 },
-  { description: 'daydreaming', emoji: '🤔', duration: 60_000 },
-  { description: 'gardening', emoji: '🥕', duration: 60_000 },
-];
+export const ACTIVITIES = localeMessages.constants.activities;
 
 export const ENGINE_ACTION_DURATION = 30000;
 
 // Bound the number of pathfinding searches we do per game step.
 export const MAX_PATHFINDS_PER_STEP = 16;
 
-export const DEFAULT_NAME = 'Me';
+export const DEFAULT_NAME = localeMessages.constants.defaultName;

@@ -6,6 +6,7 @@ import * as gentlesparkle from '../../data/animations/gentlesparkle.json';
 import * as gentlewaterfall from '../../data/animations/gentlewaterfall.json';
 import * as gentlesplash from '../../data/animations/gentlesplash.json';
 import * as windmill from '../../data/animations/windmill.json';
+import { t } from '../../locales';
 
 const animations = {
   'campfire.json': { spritesheet: campfire, url: '/ai-town/assets/spritesheets/campfire.png' },
@@ -77,7 +78,7 @@ export const PixiStaticMap = PixiComponent('StaticMap', {
     for (const [sheet, sprites] of spritesBySheet.entries()) {
       const animation = (animations as any)[sheet];
       if (!animation) {
-        console.error('Could not find animation', sheet);
+        console.error(t('frontend.errors.animationNotFound', { sheet }), sheet);
         continue;
       }
       const { spritesheet, url } = animation;
@@ -89,7 +90,12 @@ export const PixiStaticMap = PixiComponent('StaticMap', {
         for (const sprite of sprites) {
           const pixiAnimation = spriteSheet.animations[sprite.animation];
           if (!pixiAnimation) {
-            console.error('Failed to load animation', sprite);
+            console.error(
+              t('frontend.errors.animationLoadFailed', {
+                sprite: JSON.stringify(sprite),
+              }),
+              sprite,
+            );
             continue;
           }
           const pixiSprite = new PIXI.AnimatedSprite(pixiAnimation);

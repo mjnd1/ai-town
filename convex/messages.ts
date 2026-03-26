@@ -2,6 +2,7 @@ import { v } from 'convex/values';
 import { mutation, query } from './_generated/server';
 import { insertInput } from './aiTown/insertInput';
 import { conversationId, playerId } from './aiTown/ids';
+import { t } from '../locales';
 
 export const listMessages = query({
   args: {
@@ -20,7 +21,7 @@ export const listMessages = query({
         .withIndex('worldId', (q) => q.eq('worldId', args.worldId).eq('playerId', message.author))
         .first();
       if (!playerDescription) {
-        throw new Error(`Invalid author ID: ${message.author}`);
+        throw new Error(t('backend.messages.invalidAuthorId', { id: message.author }));
       }
       out.push({ ...message, authorName: playerDescription.name });
     }

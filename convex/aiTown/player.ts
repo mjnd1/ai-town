@@ -15,6 +15,7 @@ import { stopPlayer, findRoute, blocked, movePlayer } from './movement';
 import { inputHandler } from './inputHandler';
 import { characters } from '../../data/characters';
 import { PlayerDescription } from './playerDescription';
+import { t } from '../../locales';
 
 const pathfinding = v.object({
   destination: point,
@@ -101,7 +102,7 @@ export class Player {
 
     // Stop pathfinding if we've timed out.
     if (pathfinding.started + PATHFINDING_TIMEOUT < now) {
-      console.warn(`Timing out pathfinding for ${this.id}`);
+      console.warn(t('backend.player.pathfindingTimeout', { id: this.id }));
       stopPlayer(this);
     }
 
@@ -114,18 +115,23 @@ export class Player {
     if (pathfinding.state.kind === 'needsPath' && game.numPathfinds < MAX_PATHFINDS_PER_STEP) {
       game.numPathfinds++;
       if (game.numPathfinds === MAX_PATHFINDS_PER_STEP) {
-        console.warn(`Reached max pathfinds for this step`);
+        console.warn(t('backend.player.reachedMaxPathfinds'));
       }
       const route = findRoute(game, now, this, pathfinding.destination);
       if (route === null) {
-        console.log(`Failed to route to ${JSON.stringify(pathfinding.destination)}`);
+        console.log(
+          t('backend.player.failedRoute', {
+            destination: JSON.stringify(pathfinding.destination),
+          }),
+        );
         stopPlayer(this);
       } else {
         if (route.newDestination) {
           console.warn(
-            `Updating destination from ${JSON.stringify(
-              pathfinding.destination,
-            )} to ${JSON.stringify(route.newDestination)}`,
+            t('backend.player.updatingDestination', {
+              from: JSON.stringify(pathfinding.destination),
+              to: JSON.stringify(route.newDestination),
+            }),
           );
           pathfinding.destination = route.newDestination;
         }
@@ -145,14 +151,20 @@ export class Player {
     // with anything.
     const candidate = pathPosition(this.pathfinding.state.path as any, now);
     if (!candidate) {
-      console.warn(`Path out of range of ${now} for ${this.id}`);
+      console.warn(t('backend.player.pathOutOfRange', { time: now, id: this.id }));
       return;
     }
     const { position, facing, velocity } = candidate;
     const collisionReason = blocked(game, now, position, this.id);
     if (collisionReason !== null) {
       const backoff = Math.random() * PATHFINDING_BACKOFF;
-      console.warn(`Stopping path for ${this.id}, waiting for ${backoff}ms: ${collisionReason}`);
+      console.warn(
+        t('backend.player.stoppingPathWaiting', {
+          id: this.id,
+          backoff: backoff.toFixed(0),
+          reason: collisionReason,
+        }),
+      );
       this.pathfinding.state = {
         kind: 'waiting',
         until: now + backoff,
@@ -180,11 +192,11 @@ export class Player {
           numHumans++;
         }
         if (player.human === tokenIdentifier) {
-          throw new Error(`You are already in this game!`);
+          throw new Error(t('backend.player.alreadyInGame'));
         }
       }
       if (numHumans >= MAX_HUMAN_PLAYERS) {
-        throw new Error(`Only ${MAX_HUMAN_PLAYERS} human players allowed at once.`);
+        throw new Error(t('backend.player.humanLimit', { count: MAX_HUMAN_PLAYERS }));
       }
     }
     let position;
@@ -200,7 +212,7 @@ export class Player {
       break;
     }
     if (!position) {
-      throw new Error(`Failed to find a free position!`);
+      throw new Error(t('backend.player.failedFreePosition'));
     }
     const facingOptions = [
       { dx: 1, dy: 0 },
@@ -210,7 +222,7 @@ export class Player {
     ];
     const facing = facingOptions[Math.floor(Math.random() * facingOptions.length)];
     if (!characters.find((c) => c.name === character)) {
-      throw new Error(`Invalid character: ${character}`);
+      throw new Error(t('backend.player.invalidCharacter', { character }));
     }
     const playerId = game.allocId('players');
     game.world.players.set(
@@ -282,7 +294,7 @@ export const playerInputs = {
       const playerId = parseGameId('players', args.playerId);
       const player = game.world.players.get(playerId);
       if (!player) {
-        throw new Error(`Invalid player ID ${playerId}`);
+        throw new Error(t('backend.player.invalidPlayerId', { id: playerId }));
       }
       player.leave(game, now);
       return null;
@@ -297,7 +309,7 @@ export const playerInputs = {
       const playerId = parseGameId('players', args.playerId);
       const player = game.world.players.get(playerId);
       if (!player) {
-        throw new Error(`Invalid player ID ${playerId}`);
+        throw new Error(t('backend.player.invalidPlayerId', { id: playerId }));
       }
       if (args.destination) {
         movePlayer(game, now, player, args.destination);

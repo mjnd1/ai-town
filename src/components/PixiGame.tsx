@@ -14,6 +14,7 @@ import { DebugPath } from './DebugPath.tsx';
 import { PositionIndicator } from './PositionIndicator.tsx';
 import { SHOW_DEBUG_UI } from './Game.tsx';
 import { ServerGame } from '../hooks/serverGame.ts';
+import { t } from '../../locales';
 
 export const PixiGame = (props: {
   worldId: Id<'worlds'>;
@@ -54,7 +55,7 @@ export const PixiGame = (props: {
       const [dx, dy] = [screenX - e.screenX, screenY - e.screenY];
       const dist = Math.sqrt(dx * dx + dy * dy);
       if (dist > 10) {
-        console.log(`Skipping navigation on drag event (${dist}px)`);
+        console.log(t('frontend.logs.skipNavigationOnDrag', { distance: dist.toFixed(0) }));
         return;
       }
     }
@@ -76,7 +77,9 @@ export const PixiGame = (props: {
       x: Math.floor(gameSpaceTiles.x),
       y: Math.floor(gameSpaceTiles.y),
     };
-    console.log(`Moving to ${JSON.stringify(roundedTiles)}`);
+    console.log(
+      t('frontend.logs.moveTo', { destination: JSON.stringify(roundedTiles) }),
+    );
     await toastOnError(moveTo({ playerId: humanPlayerId, destination: roundedTiles }));
   };
   const { width, height, tileDim } = props.game.worldMap;

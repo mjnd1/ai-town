@@ -1,5 +1,6 @@
 import { FieldConfig, History, unpackSampleRecord } from '../../convex/engine/historicalObject';
 import { useMemo, useRef } from 'react';
+import { t } from '../../locales';
 
 export function useHistoricalValue<T extends Record<string, number>>(
   fields: FieldConfig,
@@ -13,7 +14,7 @@ export function useHistoricalValue<T extends Record<string, number>>(
       return undefined;
     }
     if (!(history instanceof ArrayBuffer)) {
-      throw new Error(`Expected ArrayBuffer, found ${typeof history}`);
+      throw new Error(t('frontend.errors.expectedArrayBuffer', { type: typeof history }));
     }
     return unpackSampleRecord(fields, history);
   }, [value && history]);
