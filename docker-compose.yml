@@ -3,6 +3,7 @@ version: "3.8"
 services:
   frontend:
     image: ghcr.io/mjnd1/ai-town-frontend:latest
+    platform: linux/arm64
     ports:
       - "5173:5173"
     environment:
@@ -44,6 +45,16 @@ services:
 
 volumes:
   data:
+    # 用本地驱动
+    driver: local
+    # 给驱动加“特殊指令”，让它不再是 Docker 内部卷
+    driver_opts:
+      # 表示不是 Docker 自己建的文件系统
+      type: none
+      # 当前项目根目录下的 data 文件夹
+      device: ./data
+      # “o” 是 options 的缩写，bind = 绑定挂载（把主机文件夹强行绑到容器里）
+      o: bind
 
 networks:
   ai-town-network:
