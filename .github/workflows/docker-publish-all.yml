@@ -1,17 +1,27 @@
-name: Build and Push All Docker Images
+name: 构建并推送所有 Docker 镜像
 
 on:
   push:
     branches: [ main ]
-  workflow_dispatch:  # 允许手动触发
+  pull_request:
+    branches: [ main ]   # PR 时构建但不 push，用于测试
+  workflow_dispatch:     # 手动触发
+
+env:
+  REGISTRY: ghcr.io
+  OWNER: ${{ github.repository_owner }}
 
 jobs:
   build-and-push-all:
     runs-on: ubuntu-latest
 
+    permissions:
+      contents: read
+      packages: write   # 必须，用于推送 GHCR
+
     steps:
       - name: Checkout code
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v4
@@ -19,33 +29,77 @@ jobs:
       - name: Login to GitHub Container Registry
         uses: docker/login-action@v4
         with:
-          registry: ghcr.io
-          username: ${{ github.repository_owner }}
+          registry: ${{ env.REGISTRY }}
+          username: ${{ env.OWNER }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ==================== 构建 frontend（你的修改在这里生效） ====================
+      # ==================== Frontend ====================
+      - name: Extract metadata for frontend
+        id: meta-frontend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-frontend
+          tags: |
+            type=ref,event=branch
+            type=ref,event=pr
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
       - name: Build and push frontend
         uses: docker/build-push-action@v7
         with:
           context: .
           file: ./Dockerfile
-          push: true
+          push: ${{ github.ref == 'refs/heads/main' }}  # 只在 main 真正 push
+          tags: ${{ steps.meta-frontend.outputs.tags }}
+          labels: ${{ steps.meta-frontend.outputs.labels }}
+          cache-from: type=gha,scope=${{ github.ref_name }}-frontend
+          cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-frontend
+
+      # ==================== Backend（官方镜像 retag + 额外标签） ====================
+      - name: Extract metadata for backend (for labels & extra tags)
+        id: meta-backend
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend
           tags: |
-            ghcr.io/${{ github.repository_owner }}/ai-town-frontend:latest
-            ghcr.io/${{ github.repository_owner }}/ai-town-frontend:${{ github.sha }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
 
-      # ==================== 拉取并推送 backend（官方镜像镜像） ====================
       - name: Pull, retag and push backend
+        if: github.ref == 'refs/heads/main'  # 只在 main push
         run: |
+          # Pull with digest for better security (可选：替换为固定版本或 digest)
           docker pull ghcr.io/get-convex/convex-backend:latest
-          docker tag ghcr.io/get-convex/convex-backend:latest ghcr.io/${{ github.repository_owner }}/ai-town-backend:latest
-          docker push ghcr.io/${{ github.repository_owner }}/ai-town-backend:latest
+          
+          # Retag with latest + sha
+          docker tag ghcr.io/get-convex/convex-backend:latest \
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:latest
+          docker tag ghcr.io/get-convex/convex-backend:latest \
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:${{ github.sha }}
+          
+          docker push ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:latest
+          docker push ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:${{ github.sha }}
 
-      # ==================== 拉取并推送 dashboard（官方镜像镜像） ====================
+      # ==================== Dashboard（官方镜像 retag + 额外标签） ====================
+      - name: Extract metadata for dashboard (for labels & extra tags)
+        id: meta-dashboard
+        uses: docker/metadata-action@v5
+        with:
+          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard
+          tags: |
+            type=sha
+            type=raw,value=latest,enable={{is_default_branch}}
+
       - name: Pull, retag and push dashboard
+        if: github.ref == 'refs/heads/main'
         run: |
           docker pull ghcr.io/get-convex/convex-dashboard:latest
-          docker tag ghcr.io/get-convex/convex-dashboard:latest ghcr.io/${{ github.repository_owner }}/ai-town-dashboard:latest
-          docker push ghcr.io/${{ github.repository_owner }}/ai-town-dashboard:latest
+          
+          docker tag ghcr.io/get-convex/convex-dashboard:latest \
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:latest
+          docker tag ghcr.io/get-convex/convex-dashboard:latest \
+            ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:${{ github.sha }}
+          
+          docker push ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:latest
+          docker push ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:${{ github.sha }}
