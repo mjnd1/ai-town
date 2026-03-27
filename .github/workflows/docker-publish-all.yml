@@ -1,4 +1,4 @@
-name: 构建并推送所有 Docker 镜像
+name: 构建并推送所有 Docker 镜像（支持多架构）
 
 on:
   push:
@@ -23,7 +23,7 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v5
 
-      # 设置 QEMU（支持跨平台构建 arm64）
+      # ==================== 基础设施 ====================
       - name: Set up QEMU
         uses: docker/setup-qemu-action@v4
 
@@ -37,7 +37,7 @@ jobs:
           username: ${{ env.OWNER }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      # ==================== Frontend ====================
+      # ==================== Frontend（本地构建，多架构） ====================
       - name: Extract metadata for frontend
         id: meta-frontend
         uses: docker/metadata-action@v5
@@ -61,50 +61,20 @@ jobs:
           cache-from: type=gha,scope=${{ github.ref_name }}-frontend
           cache-to: type=gha,mode=max,scope=${{ github.ref_name }}-frontend
 
-      # ==================== Backend（官方镜像 retag + 额外标签） ====================
-      - name: Extract metadata for backend (for labels & extra tags)
-        id: meta-backend
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend
-          tags: |
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Pull, retag and push backend
-        if: github.ref == 'refs/heads/main' # 只在 main push
-        run: |
-          # Pull with digest for better security (可选：替换为固定版本或 digest)
-          docker pull ghcr.io/get-convex/convex-backend:latest
-
-          # Retag with latest + sha
-          docker tag ghcr.io/get-convex/convex-backend:latest \
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:latest
-          docker tag ghcr.io/get-convex/convex-backend:latest \
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:${{ github.sha }}
-
-          docker push ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:latest
-          docker push ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:${{ github.sha }}
-
-      # ==================== Dashboard（官方镜像 retag + 额外标签） ====================
-      - name: Extract metadata for dashboard (for labels & extra tags)
-        id: meta-dashboard
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard
-          tags: |
-            type=sha
-            type=raw,value=latest,enable={{is_default_branch}}
-
-      - name: Pull, retag and push dashboard
+      # ==================== Backend（官方镜像，多架构安全 retag） ====================
+      - name: Retag backend with imagetools (multi-arch safe)
         if: github.ref == 'refs/heads/main'
         run: |
-          docker pull ghcr.io/get-convex/convex-dashboard:latest
+          docker buildx imagetools create \
+            -t ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:latest \
+            -t ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-backend:${{ github.sha }} \
+            ghcr.io/get-convex/convex-backend:latest
 
-          docker tag ghcr.io/get-convex/convex-dashboard:latest \
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:latest
-          docker tag ghcr.io/get-convex/convex-dashboard:latest \
-            ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:${{ github.sha }}
-
-          docker push ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:latest
-          docker push ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:${{ github.sha }}
+      # ==================== Dashboard（官方镜像，多架构安全 retag） ====================
+      - name: Sync Dashboard Image (Multi-arch)
+        if: github.ref == 'refs/heads/main'
+        run: |
+          docker buildx imagetools create \
+            -t ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:latest \
+            -t ${{ env.REGISTRY }}/${{ env.OWNER }}/ai-town-dashboard:${{ github.sha }} \
+            ghcr.io/get-convex/convex-dashboard:latest
