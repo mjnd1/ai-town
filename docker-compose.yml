@@ -4,10 +4,10 @@ services:
     platform: linux/arm64
     ports:
       - "${FRONTENDPORT}:5173"
-    volumes:
-      - .env.local:/.env.local
     environment:
       - VITE_CONVEX_URL=${VITE_CONVEX_URL}
+      - CONVEX_SELF_HOSTED_ADMIN_KEY=${CONVEX_SELF_HOSTED_ADMIN_KEY}
+      - CONVEX_SELF_HOSTED_URL=${CONVEX_SELF_HOSTED_URL}
     networks:
       - ai-town-network
 
