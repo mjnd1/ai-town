@@ -3,7 +3,7 @@ services:
     image: ghcr.io/mjnd1/ai-town-frontend:latest
     platform: linux/arm64
     ports:
-      - "127.0.0.1:${FRONTENDPORT}:5173"
+      - "${FRONTENDPORT}:5173"
     environment:
       - VITE_CONVEX_URL=${VITE_CONVEX_URL}
     networks:
@@ -13,8 +13,8 @@ services:
     image: ghcr.io/mjnd1/ai-town-backend:latest
     platform: linux/arm64
     ports:
-      - "127.0.0.1:${CONVEX_PORT:-9081}:3210"
-      - "127.0.0.1:${SITE_PROXY_PORT:-9003}:3211"
+      - "${CONVEX_PORT:-9081}:3210"
+      - "${SITE_PROXY_PORT:-9003}:3211"
     volumes:
       - data:/convex/data
     environment:
