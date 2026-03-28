@@ -4,6 +4,8 @@ services:
     platform: linux/arm64
     ports:
       - "${FRONTENDPORT}:5173"
+    volumes:
+      - .env.local:/.env.local
     environment:
       - VITE_CONVEX_URL=${VITE_CONVEX_URL}
     networks:
